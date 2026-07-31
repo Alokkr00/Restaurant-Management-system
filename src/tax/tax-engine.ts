@@ -68,7 +68,7 @@ export class IndiaGstTaxStrategy implements TaxStrategy {
 }
 
 export class PluggableTaxEngine {
-  private strategies: Map<string, TaxStrategy> = new Map([
+  private strategies: Map<string, TaxStrategy> = new Map<string, TaxStrategy>([
     ['US_SALES_TAX', new USSalesTaxStrategy()],
     ['EU_VAT', new EUVatTaxStrategy()],
     ['INDIA_GST', new IndiaGstTaxStrategy()],
