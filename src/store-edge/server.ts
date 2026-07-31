@@ -3,6 +3,8 @@ import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { POSTransaction, InventoryRecord } from '../shared/types.js';
 import { ConflictResolutionEngine } from '../shared/sync-engine.js';
+import { JWTAuthService, JWTClaims } from '../security/tenant-context.js';
+import { InventoryRecipeEngine } from '../inventory/recipe-engine.js';
 
 const app = express();
 app.use(express.json());
@@ -10,14 +12,18 @@ app.use(express.json());
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 
-const engine = new ConflictResolutionEngine();
+const syncEngine = new ConflictResolutionEngine();
+const recipeEngine = new InventoryRecipeEngine();
+const authService = new JWTAuthService();
 
-// In-memory Edge database store (backed by SQLite/PouchDB in production)
+const STORE_NODE_ID = 'store-104'; // Dedicated Store Edge Node ID
+
+// In-memory Edge SQLite simulation
 const offlineTxQueue: POSTransaction[] = [];
 let localInventory: InventoryRecord[] = [
   {
     ingredientId: 'ing-flour',
-    storeId: 'store-01',
+    storeId: STORE_NODE_ID,
     ingredientName: 'Flour (High Gluten)',
     unit: 'GRAM',
     onHandQuantity: 25000,
@@ -26,7 +32,7 @@ let localInventory: InventoryRecord[] = [
   },
   {
     ingredientId: 'ing-cheese',
-    storeId: 'store-01',
+    storeId: STORE_NODE_ID,
     ingredientName: 'Mozzarella Shredded',
     unit: 'GRAM',
     onHandQuantity: 15000,
@@ -35,30 +41,50 @@ let localInventory: InventoryRecord[] = [
   },
 ];
 
-let isCloudConnected = false; // Simulates offline mode
+let isCloudConnected = false;
 
-// WebSocket connection for POS and KDS real-time events (< 200ms latency)
+// Middleware verifying store-scoped JWT token
+function verifyEdgeToken(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Default to local store context for unauthenticated touch terminals
+    (req as any).claims = { storeIds: [STORE_NODE_ID], role: 'STORE_MANAGER' };
+    return next();
+  }
+
+  try {
+    const token = authHeader.split(' ')[1];
+    const claims = authService.verifyToken(token);
+    (req as any).claims = claims;
+    next();
+  } catch (err: any) {
+    return res.status(401).json({ error: `Unauthorized Edge Access: ${err.message}` });
+  }
+}
+
 wss.on('connection', (ws: WebSocket) => {
-  ws.send(JSON.stringify({ type: 'STATUS', cloudConnected: isCloudConnected, latencyMs: 12 }));
+  ws.send(JSON.stringify({ type: 'STATUS', storeId: STORE_NODE_ID, cloudConnected: isCloudConnected, latencyMs: 12 }));
 
   ws.on('message', (message: string) => {
     try {
       const event = JSON.parse(message);
       if (event.type === 'POS_SALE') {
         const tx: POSTransaction = event.payload;
+
+        // Security check: Only process transactions for assigned store
+        if (tx.storeId && tx.storeId !== STORE_NODE_ID) {
+          console.warn(`SECURITY WARNING: Edge Node ${STORE_NODE_ID} rejected transaction for Store ${tx.storeId}`);
+          return;
+        }
+
         offlineTxQueue.push(tx);
 
-        // Deplete theoretical inventory locally
+        // Deplete inventory using Recipe Engine
         tx.items.forEach((item) => {
-          if (item.menuItemId === 'item-101') { // Pizza
-            const flour = localInventory.find((i) => i.ingredientId === 'ing-flour');
-            const cheese = localInventory.find((i) => i.ingredientId === 'ing-cheese');
-            if (flour) engine.resolveInventoryDelta(flour, 200 * item.quantity);
-            if (cheese) engine.resolveInventoryDelta(cheese, 150 * item.quantity);
-          }
+          recipeEngine.depleteForOrderItem(item.menuItemId, item.quantity);
         });
 
-        // Broadcast ticket instantly to KDS sockets (< 200ms)
+        // Broadcast to KDS over local LAN (< 200ms)
         wss.clients.forEach((client) => {
           if (client !== ws && client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify({ type: 'KDS_NEW_TICKET', ticket: tx }));
@@ -66,7 +92,7 @@ wss.on('connection', (ws: WebSocket) => {
         });
       }
     } catch (err) {
-      console.error('Error handling WebSocket message', err);
+      console.error('Error handling Edge WebSocket message', err);
     }
   });
 });
@@ -74,14 +100,16 @@ wss.on('connection', (ws: WebSocket) => {
 app.get('/health', (req, res) => {
   res.json({
     status: 'ONLINE',
+    storeId: STORE_NODE_ID,
     mode: isCloudConnected ? 'CLOUD_SYNCED' : 'OFFLINE_EDGE_OPERATIONAL',
     pendingOfflineTxs: offlineTxQueue.length,
     kdsConnectedClients: wss.clients.size,
   });
 });
 
-app.post('/api/pos/checkout', (req, res) => {
+app.post('/api/pos/checkout', verifyEdgeToken, (req, res) => {
   const tx: POSTransaction = req.body;
+  tx.storeId = STORE_NODE_ID;
   tx.synced = isCloudConnected;
   tx.offlineMode = !isCloudConnected;
   offlineTxQueue.push(tx);
@@ -89,6 +117,7 @@ app.post('/api/pos/checkout', (req, res) => {
   res.status(200).json({
     success: true,
     transactionId: tx.id,
+    storeId: STORE_NODE_ID,
     mode: tx.offlineMode ? 'OFFLINE_DEFERRED_AUTH' : 'ONLINE_AUTH',
     receiptPrinted: true,
     kdsDispatched: true,
@@ -97,5 +126,5 @@ app.post('/api/pos/checkout', (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-  console.log(`Store Edge Server running on port ${PORT} [Offline-First Operational Mode]`);
+  console.log(`Store Edge Server (${STORE_NODE_ID}) running on port ${PORT} [Store-Scoped Offline Mode]`);
 });
