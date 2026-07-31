@@ -1,4 +1,4 @@
-// Enterprise Multi-Unit RMS - Definitive Full-Stack Workspaces Suite
+// Enterprise Multi-Unit RMS - Definitive Workspaces Suite
 
 const EDGE_SERVER_URL = 'http://localhost:3001';
 const EDGE_WS_URL = 'ws://localhost:3001';
@@ -8,7 +8,7 @@ const state = {
   storeOffline: false,
   apiConnected: false,
   wsConnected: false,
-  modalOpen: null, // null | 'add_menu_item' | 'field_audit' | 'log_spoilage' | 'checkout_receipt' | 'add_shift'
+  modalOpen: null, // null | 'add_menu_item' | 'field_audit' | 'log_spoilage' | 'add_shift'
   selectedTaxJurisdiction: 'US_SALES_TAX',
   menuItems: [
     { id: 'item-101', sku: 'PIZ-PEP-LG', name: 'Large Pepperoni Pizza', category: 'Pizzas', basePrice: 18.99, image: '/pepperoni_pizza.jpg', allergens: ['DAIRY', 'GLUTEN'], isBrandLocked: true, version: 3 },
@@ -45,7 +45,6 @@ const state = {
     { id: 'aud-st-101', storeId: 'Store #101 (Downtown)', inspector: 'Mark Vance', score: '98%', date: '2026-07-30', status: 'PASSED' },
   ],
   tipPoolTotal: 450.00,
-  latestReceipt: null,
 };
 
 // Initial Connection
@@ -95,7 +94,7 @@ async function initBackendConnection() {
 function renderApp() {
   const appEl = document.getElementById('app');
   appEl.innerHTML = `
-    <!-- Top Glassmorphic Navigation -->
+    <!-- Top Navigation -->
     <header class="navbar">
       <div class="brand-section">
         <img src="/restaurant_logo.jpg" alt="Logo" class="logo-img" />
@@ -120,14 +119,14 @@ function renderApp() {
         </select>
       </div>
 
-      <!-- Edge Connection Status -->
+      <!-- Connection Pill -->
       <div class="status-pill ${state.storeOffline ? 'offline' : ''}" onclick="toggleOffline()">
         <span class="status-dot"></span>
         <span>${state.storeOffline ? 'STORE EDGE (OFFLINE)' : `STORE EDGE (${state.wsConnected ? 'WS & REST ACTIVE' : 'ONLINE'})`}</span>
       </div>
     </header>
 
-    <!-- Main Workspace Container -->
+    <!-- Main View -->
     <main class="view-container">
       ${renderPersonaWorkspace()}
     </main>
@@ -151,7 +150,7 @@ function renderPersonaWorkspace() {
   }
 }
 
-// 1. HQ EXECUTIVE / MENU ENGINEER WORKSPACE
+// 1. HQ EXECUTIVE WORKSPACE
 function renderHQExecutiveWorkspace() {
   return `
     <div class="section-header">
@@ -159,10 +158,10 @@ function renderHQExecutiveWorkspace() {
         <h2 class="section-title">🏢 HQ Menu Inheritance & Brand Control Workspace</h2>
         <p class="section-subtitle">Platform ➔ Brand ➔ Region ➔ Store Resolution • Brand Lock Safeguards • Staged Canary Rollout</p>
       </div>
-      <div style="display:flex; gap:0.75rem;">
-        <button class="btn-primary" style="background:var(--accent-blue);" onclick="openModal('add_menu_item')">➕ Add Master Menu Item</button>
-        <button class="btn-primary" style="background:var(--accent-purple);" onclick="increaseCanaryRollout()">🚀 Advance Canary Rollout (${state.canaryRolloutPct}%)</button>
-        <button class="btn-primary" style="background:var(--accent-rose);" onclick="rollbackCanary()">⚡ 1-Click Rollback</button>
+      <div class="header-actions">
+        <button class="btn-primary" onclick="openModal('add_menu_item')">➕ Add Master Menu Item</button>
+        <button class="btn-primary btn-purple" onclick="increaseCanaryRollout()">🚀 Advance Canary Rollout (${state.canaryRolloutPct}%)</button>
+        <button class="btn-primary btn-danger" onclick="rollbackCanary()">⚡ 1-Click Rollback</button>
       </div>
     </div>
 
@@ -197,8 +196,8 @@ function renderHQExecutiveWorkspace() {
                 <td>${item.isBrandLocked ? '<span class="badge badge-locked">🔒 BRAND LOCKED</span>' : '<span class="badge badge-warning">UNLOCKED</span>'}</td>
                 <td style="font-family:var(--font-mono);">v${item.version || 1}</td>
                 <td>
-                  <button class="btn-primary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="toggleBrandLock('${item.id}')">${item.isBrandLocked ? 'Unlock' : 'Lock HQ'}</button>
-                  <button class="btn-primary" style="padding:0.3rem 0.6rem; font-size:0.75rem; background:var(--accent-purple);" onclick="promptPriceEdit('${item.id}')">Edit Price</button>
+                  <button class="btn-primary" style="padding:0.3rem 0.65rem; font-size:0.75rem;" onclick="toggleBrandLock('${item.id}')">${item.isBrandLocked ? 'Unlock' : 'Lock HQ'}</button>
+                  <button class="btn-primary btn-purple" style="padding:0.3rem 0.65rem; font-size:0.75rem;" onclick="promptPriceEdit('${item.id}')">Edit Price</button>
                 </td>
               </tr>
             `).join('')}
@@ -207,7 +206,7 @@ function renderHQExecutiveWorkspace() {
       </div>
     </div>
 
-    <!-- Cryptographic SHA-256 Audit Log Ledger -->
+    <!-- SHA-256 Audit Log Ledger -->
     <div class="card">
       <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display); margin-bottom:1rem;">🛡️ Tamper-Proof Cryptographic SHA-256 Audit Log Ledger</h3>
       <div class="table-container">
@@ -248,71 +247,77 @@ function renderRegionalDirectorWorkspace() {
         <h2 class="section-title">🌐 Regional Director Benchmarking & Field Audit Tool</h2>
         <p class="section-subtitle">Cross-Location Store Heatmaps • Brand Standards Inspection • Mobile Field Auditing</p>
       </div>
-      <button class="btn-primary" style="background:var(--accent-blue);" onclick="openModal('field_audit')">📱 Conduct New Mobile Field Inspection</button>
+      <div class="header-actions">
+        <button class="btn-primary" onclick="openModal('field_audit')">📱 Conduct Mobile Field Inspection</button>
+      </div>
     </div>
 
     <!-- Benchmarking Table -->
     <div class="card" style="margin-bottom:2rem;">
       <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display); margin-bottom:1rem;">📊 Multi-Store Performance Benchmarking (Chicago Region)</h3>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Store Location</th>
-            <th>Gross Revenue</th>
-            <th>COGS % (Target 29%)</th>
-            <th>Labor % (Target <= 22%)</th>
-            <th>Variance Alert</th>
-            <th>Audit Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style="font-weight:700;">Store #101 (Downtown Chicago)</td>
-            <td style="font-family:var(--font-mono);">$8,450.00</td>
-            <td style="font-family:var(--font-mono); color:var(--accent-emerald);">27.8%</td>
-            <td style="font-family:var(--font-mono); color:var(--accent-emerald);">18.1%</td>
-            <td><span class="badge badge-success">NORMAL</span></td>
-            <td><span class="badge badge-success">98% PASSED</span></td>
-          </tr>
-          <tr>
-            <td style="font-weight:700;">Store #104 (Chicago West)</td>
-            <td style="font-family:var(--font-mono);">$6,200.00</td>
-            <td style="font-family:var(--font-mono); color:var(--accent-rose);">31.2%</td>
-            <td style="font-family:var(--font-mono); color:var(--accent-emerald);">18.4%</td>
-            <td><span class="badge badge-alert">SHRINKAGE ALERT</span></td>
-            <td><span class="badge badge-success">96% PASSED</span></td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Store Location</th>
+              <th>Gross Revenue</th>
+              <th>COGS % (Target 29%)</th>
+              <th>Labor % (Target <= 22%)</th>
+              <th>Variance Alert</th>
+              <th>Audit Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="font-weight:700;">Store #101 (Downtown Chicago)</td>
+              <td style="font-family:var(--font-mono);">$8,450.00</td>
+              <td style="font-family:var(--font-mono); color:var(--accent-emerald);">27.8%</td>
+              <td style="font-family:var(--font-mono); color:var(--accent-emerald);">18.1%</td>
+              <td><span class="badge badge-success">NORMAL</span></td>
+              <td><span class="badge badge-success">98% PASSED</span></td>
+            </tr>
+            <tr>
+              <td style="font-weight:700;">Store #104 (Chicago West)</td>
+              <td style="font-family:var(--font-mono);">$6,200.00</td>
+              <td style="font-family:var(--font-mono); color:var(--accent-rose);">31.2%</td>
+              <td style="font-family:var(--font-mono); color:var(--accent-emerald);">18.4%</td>
+              <td><span class="badge badge-alert">SHRINKAGE ALERT</span></td>
+              <td><span class="badge badge-success">96% PASSED</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Field Audit Log -->
     <div class="card">
       <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display); margin-bottom:1rem;">📋 Completed Mobile Field Audits</h3>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Audit ID</th>
-            <th>Store Unit</th>
-            <th>Field Inspector</th>
-            <th>Compliance Score</th>
-            <th>Audit Date</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${state.fieldAudits.map(f => `
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
             <tr>
-              <td style="font-family:var(--font-mono); font-weight:700;">${f.id}</td>
-              <td style="font-weight:700;">${f.storeId}</td>
-              <td>${f.inspector}</td>
-              <td style="font-family:var(--font-mono); font-weight:800; color:var(--accent-emerald);">${f.score}</td>
-              <td style="font-size:0.85rem; color:var(--text-secondary);">${f.date}</td>
-              <td><span class="badge badge-success">${f.status}</span></td>
+              <th>Audit ID</th>
+              <th>Store Unit</th>
+              <th>Field Inspector</th>
+              <th>Compliance Score</th>
+              <th>Audit Date</th>
+              <th>Status</th>
             </tr>
-          `).join('')}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            ${state.fieldAudits.map(f => `
+              <tr>
+                <td style="font-family:var(--font-mono); font-weight:700;">${f.id}</td>
+                <td style="font-weight:700;">${f.storeId}</td>
+                <td>${f.inspector}</td>
+                <td style="font-family:var(--font-mono); font-weight:800; color:var(--accent-emerald);">${f.score}</td>
+                <td style="font-size:0.85rem; color:var(--text-secondary);">${f.date}</td>
+                <td><span class="badge badge-success">${f.status}</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
     </div>
   `;
 }
@@ -325,53 +330,57 @@ function renderFranchiseeWorkspace() {
         <h2 class="section-title">📈 Franchisee Self-Service Portal (Store #104)</h2>
         <p class="section-subtitle">Tenant-Isolated Financials • Tiered Royalty Breakdown • Automated ACH Statement Generator</p>
       </div>
-      <button class="btn-primary" style="background:var(--accent-emerald);" onclick="generateRoyaltyStatement()">📄 Export Royalty ACH Statement (PDF/CSV)</button>
+      <div class="header-actions">
+        <button class="btn-primary btn-success" onclick="generateRoyaltyStatement()">📄 Export Royalty ACH Statement</button>
+      </div>
     </div>
 
     <div class="grid-2">
       <div class="card">
         <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display); margin-bottom:1rem;">💰 Tenant P&L Contribution Breakdown</h3>
-        <table class="data-table">
-          <tbody>
-            <tr>
-              <td style="font-weight:700;">Gross POS Live Sales</td>
-              <td style="font-family:var(--font-mono); color:var(--accent-emerald); font-weight:800; text-align:right;">$64,250.00</td>
-            </tr>
-            <tr>
-              <td>Cost of Goods Sold (COGS 29.1%)</td>
-              <td style="font-family:var(--font-mono); color:var(--accent-rose); text-align:right;">-$18,696.75</td>
-            </tr>
-            <tr>
-              <td>Store Labor Expenses (18.4%)</td>
-              <td style="font-family:var(--font-mono); color:var(--accent-rose); text-align:right;">-$11,822.00</td>
-            </tr>
-            <tr>
-              <td>Brand Royalty Fee (4.5%)</td>
-              <td style="font-family:var(--font-mono); color:var(--accent-blue); text-align:right;">-$2,891.25</td>
-            </tr>
-            <tr>
-              <td>National Marketing Fund (2.0%)</td>
-              <td style="font-family:var(--font-mono); color:var(--accent-purple); text-align:right;">-$1,285.00</td>
-            </tr>
-            <tr style="border-top:2px solid rgba(255,255,255,0.15);">
-              <td style="font-weight:800; font-size:1.1rem;">Net Store Operating Profit</td>
-              <td style="font-family:var(--font-mono); color:#34d399; font-weight:800; font-size:1.2rem; text-align:right;">$29,555.00</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="table-container">
+          <table class="data-table">
+            <tbody>
+              <tr>
+                <td style="font-weight:700;">Gross POS Live Sales</td>
+                <td style="font-family:var(--font-mono); color:var(--accent-emerald); font-weight:800; text-align:right;">$64,250.00</td>
+              </tr>
+              <tr>
+                <td>Cost of Goods Sold (COGS 29.1%)</td>
+                <td style="font-family:var(--font-mono); color:var(--accent-rose); text-align:right;">-$18,696.75</td>
+              </tr>
+              <tr>
+                <td>Store Labor Expenses (18.4%)</td>
+                <td style="font-family:var(--font-mono); color:var(--accent-rose); text-align:right;">-$11,822.00</td>
+              </tr>
+              <tr>
+                <td>Brand Royalty Fee (4.5%)</td>
+                <td style="font-family:var(--font-mono); color:var(--accent-blue); text-align:right;">-$2,891.25</td>
+              </tr>
+              <tr>
+                <td>National Marketing Fund (2.0%)</td>
+                <td style="font-family:var(--font-mono); color:var(--accent-purple); text-align:right;">-$1,285.00</td>
+              </tr>
+              <tr style="border-top:2px solid rgba(255,255,255,0.15);">
+                <td style="font-weight:800; font-size:1.1rem;">Net Store Operating Profit</td>
+                <td style="font-family:var(--font-mono); color:#34d399; font-weight:800; font-size:1.2rem; text-align:right;">$29,555.00</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div class="card">
         <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display); margin-bottom:1rem;">📂 Franchise Agreement & Compliance Library</h3>
         <div style="display:flex; flex-direction:column; gap:0.85rem;">
-          <div style="padding:0.9rem; background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:10px; display:flex; justify-content:space-between; align-items:center;">
+          <div style="padding:1rem; background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:10px; display:flex; justify-content:space-between; align-items:center;">
             <div>
               <strong style="color:#ffffff;">Franchise Disclosure Agreement v4.2</strong>
               <div style="font-size:0.8rem; color:var(--text-secondary);">Signed Jan 15, 2026 • Valid thru 2036</div>
             </div>
-            <button class="btn-primary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="alert('Downloading Agreement PDF...')">View PDF</button>
+            <button class="btn-primary" style="padding:0.35rem 0.75rem; font-size:0.75rem;" onclick="alert('Downloading Agreement PDF...')">View PDF</button>
           </div>
-          <div style="padding:0.9rem; background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:10px; display:flex; justify-content:space-between; align-items:center;">
+          <div style="padding:1rem; background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:10px; display:flex; justify-content:space-between; align-items:center;">
             <div>
               <strong style="color:#ffffff;">Store Opening Milestone Checklist</strong>
               <div style="font-size:0.8rem; color:var(--text-secondary);">100% Passed • Verified by HQ</div>
@@ -392,45 +401,49 @@ function renderStoreGMWorkspace() {
         <h2 class="section-title">⏱️ Store GM Employee Shift & Fair Workweek Workspace</h2>
         <p class="section-subtitle">Real-time Employee Timecards • AI Labor Scheduler • Clopening Rest Guardrails (< 11h Rest)</p>
       </div>
-      <button class="btn-primary" style="background:var(--accent-blue);" onclick="openModal('add_shift')">📅 Add Shift to AI Schedule</button>
+      <div class="header-actions">
+        <button class="btn-primary" onclick="openModal('add_shift')">📅 Add Shift to AI Schedule</button>
+      </div>
     </div>
 
     <!-- Active Employee Timecards Table -->
     <div class="card" style="margin-bottom:2rem;">
       <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display); margin-bottom:1rem;">👥 Shift Employee Timecards & Break Attestations</h3>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Employee Name</th>
-            <th>Role</th>
-            <th>Clock Status</th>
-            <th>Shift Start</th>
-            <th>Shift Hours</th>
-            <th>Meal/Rest Break Attestation</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${state.employees.map(e => `
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
             <tr>
-              <td style="font-weight:700;">${e.name}</td>
-              <td>${e.role}</td>
-              <td>${e.status === 'CLOCKED_IN' ? '<span class="badge badge-success">🟢 CLOCKED IN</span>' : '<span class="badge badge-locked">🔴 CLOCKED OUT</span>'}</td>
-              <td style="font-size:0.85rem; color:var(--text-secondary);">${e.shiftStart}</td>
-              <td style="font-family:var(--font-mono);">${e.hours} hrs</td>
-              <td>${e.breakAttested ? '<span class="badge badge-success">✅ SIGNED AT CLOCK-OUT</span>' : '<span class="badge badge-alert">PENDING</span>'}</td>
-              <td>
-                <button class="btn-primary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="toggleEmployeeClock('${e.id}')">${e.status === 'CLOCKED_IN' ? 'Clock Out' : 'Clock In'}</button>
-              </td>
+              <th>Employee Name</th>
+              <th>Role</th>
+              <th>Clock Status</th>
+              <th>Shift Start</th>
+              <th>Shift Hours</th>
+              <th>Meal/Rest Break Attestation</th>
+              <th>Actions</th>
             </tr>
-          `).join('')}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            ${state.employees.map(e => `
+              <tr>
+                <td style="font-weight:700;">${e.name}</td>
+                <td>${e.role}</td>
+                <td>${e.status === 'CLOCKED_IN' ? '<span class="badge badge-success">🟢 CLOCKED IN</span>' : '<span class="badge badge-locked">🔴 CLOCKED OUT</span>'}</td>
+                <td style="font-size:0.85rem; color:var(--text-secondary);">${e.shiftStart}</td>
+                <td style="font-family:var(--font-mono);">${e.hours} hrs</td>
+                <td>${e.breakAttested ? '<span class="badge badge-success">✅ SIGNED AT CLOCK-OUT</span>' : '<span class="badge badge-alert">PENDING</span>'}</td>
+                <td>
+                  <button class="btn-primary" style="padding:0.35rem 0.75rem; font-size:0.75rem;" onclick="toggleEmployeeClock('${e.id}')">${e.status === 'CLOCKED_IN' ? 'Clock Out' : 'Clock In'}</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
     </div>
   `;
 }
 
-// 5. KITCHEN MANAGER / PREP LEAD WORKSPACE
+// 5. KITCHEN MANAGER WORKSPACE
 function renderKitchenLeadWorkspace() {
   return `
     <div class="section-header">
@@ -438,14 +451,16 @@ function renderKitchenLeadWorkspace() {
         <h2 class="section-title">👨‍🍳 Kitchen KDS Ticket Queue & Spoilage Production Workspace</h2>
         <p class="section-subtitle">Real-time LAN WebSocket Tickets (< 200ms) • Recipe Batch Exploder • Spoilage Logger</p>
       </div>
-      <button class="btn-primary" style="background:var(--accent-rose);" onclick="openModal('log_spoilage')">🗑️ Log Kitchen Spoilage / Waste</button>
+      <div class="header-actions">
+        <button class="btn-primary btn-danger" onclick="openModal('log_spoilage')">🗑️ Log Kitchen Spoilage / Waste</button>
+      </div>
     </div>
 
     <!-- Live KDS Ticket Grid -->
     <div class="grid-2" style="margin-bottom:2rem;">
-      ${state.kdsTickets.map((t, idx) => `
+      ${state.kdsTickets.map((t) => `
         <div class="card" style="border: 2px solid ${t.urgent ? 'var(--accent-rose)' : 'var(--border-color)'};">
-          <div style="display:flex; justify-between; align-items:center; margin-bottom:0.75rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
             <div>
               <strong style="font-size:1.1rem; color:#ffffff;">Ticket #${t.id}</strong>
               <div style="font-size:0.8rem; color:var(--text-secondary);">${t.source} • ${t.time}</div>
@@ -454,13 +469,13 @@ function renderKitchenLeadWorkspace() {
           </div>
           <div style="padding:0.75rem 0; border-top:1px solid var(--border-color); border-bottom:1px solid var(--border-color); margin-bottom:1rem;">
             ${t.items.map(i => `
-              <div style="display:flex; justify-between; padding:0.35rem 0; font-weight:700;">
+              <div style="display:flex; justify-content:space-between; padding:0.35rem 0; font-weight:700;">
                 <span>${i.qty}x ${i.name}</span>
                 ${i.allergens ? `<span style="color:var(--accent-rose); font-size:0.8rem;">⚠️ ${i.allergens.join(', ')}</span>` : ''}
               </div>
             `).join('')}
           </div>
-          <button class="btn-primary" style="width:100%; background:var(--accent-emerald);" onclick="bumpKDSTicket('${t.id}')">✅ BUMP TICKET (COMPLETE)</button>
+          <button class="btn-primary btn-success" style="width:100%; justify-content:center;" onclick="bumpKDSTicket('${t.id}')">✅ BUMP TICKET (COMPLETE)</button>
         </div>
       `).join('')}
     </div>
@@ -468,28 +483,30 @@ function renderKitchenLeadWorkspace() {
     <!-- Spoilage Logs -->
     <div class="card">
       <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display); margin-bottom:1rem;">📦 Logged Kitchen Waste & Spoilage History</h3>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Item Name</th>
-            <th>Quantity</th>
-            <th>Reason Code</th>
-            <th>Cost Impact</th>
-            <th>Logged By</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${state.spoilageLogs.map(s => `
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
             <tr>
-              <td style="font-weight:700;">${s.item}</td>
-              <td style="font-family:var(--font-mono);">${s.qty}</td>
-              <td><span class="badge badge-alert">${s.reason}</span></td>
-              <td style="font-family:var(--font-mono); color:var(--accent-rose); font-weight:800;">${s.cost}</td>
-              <td style="font-size:0.85rem;">${s.loggedBy}</td>
+              <th>Item Name</th>
+              <th>Quantity</th>
+              <th>Reason Code</th>
+              <th>Cost Impact</th>
+              <th>Logged By</th>
             </tr>
-          `).join('')}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            ${state.spoilageLogs.map(s => `
+              <tr>
+                <td style="font-weight:700;">${s.item}</td>
+                <td style="font-family:var(--font-mono);">${s.qty}</td>
+                <td><span class="badge badge-alert">${s.reason}</span></td>
+                <td style="font-family:var(--font-mono); color:var(--accent-rose); font-weight:800;">${s.cost}</td>
+                <td style="font-size:0.85rem;">${s.loggedBy}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
     </div>
   `;
 }
@@ -505,8 +522,8 @@ function renderCashierWorkspace() {
       <!-- POS Cards -->
       <div>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-          <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display);">🛒 Touch POS Terminal (Pluggable Tax Engine)</h3>
-          <select class="persona-select" style="background:#0e1628; padding:0.4rem 0.8rem; border-radius:8px; border:1px solid var(--border-color);" onchange="changeTaxStrategy(this.value)">
+          <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display);">🛒 Touch POS Terminal</h3>
+          <select class="persona-select" style="background:#0f172a; padding:0.4rem 0.8rem; border-radius:8px; border:1px solid var(--border-color);" onchange="changeTaxStrategy(this.value)">
             <option value="US_SALES_TAX" ${state.selectedTaxJurisdiction === 'US_SALES_TAX' ? 'selected' : ''}>🇺🇸 US Sales Tax (8%)</option>
             <option value="EU_VAT" ${state.selectedTaxJurisdiction === 'EU_VAT' ? 'selected' : ''}>🇪🇺 European VAT (20%)</option>
             <option value="INDIA_GST" ${state.selectedTaxJurisdiction === 'INDIA_GST' ? 'selected' : ''}>🇮🇳 India GST (5%)</option>
@@ -573,7 +590,7 @@ function renderCashierWorkspace() {
             <span style="color:var(--accent-emerald);">$${total.toFixed(2)}</span>
           </div>
 
-          <button class="checkout-btn" style="width:100%; margin-top:1.25rem; background:linear-gradient(135deg, #10b981, #059669); color:white; border:none; padding:1.1rem; border-radius:12px; font-weight:800; font-family:var(--font-display); cursor:pointer;" onclick="submitCheckout()" ${state.cart.length === 0 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>
+          <button class="btn-primary btn-success" style="width:100%; margin-top:1.25rem; padding:1rem; justify-content:center;" onclick="submitCheckout()" ${state.cart.length === 0 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>
             ${state.storeOffline ? '⚡ PROCESS OFFLINE CHECKOUT (DEFERRED AUTH)' : '💳 COMPLETE CHECKOUT (ADYEN P2PE)'}
           </button>
         </div>
@@ -594,30 +611,32 @@ function renderProcurementWorkspace() {
 
     <div class="card">
       <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display); margin-bottom:1rem;">⚠️ Inventory Variance Sheet (Theoretical vs Actual)</h3>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Ingredient Name</th>
-            <th>Theoretical Count</th>
-            <th>Actual Count</th>
-            <th>Variance %</th>
-            <th>Shrinkage Status</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${state.inventoryVariances.map(v => `
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
             <tr>
-              <td style="font-weight:700;">${v.name}</td>
-              <td style="font-family:var(--font-mono);">${v.theoretical} ${v.unit}</td>
-              <td style="font-family:var(--font-mono);">${v.actual} ${v.unit}</td>
-              <td style="font-family:var(--font-mono); color:${v.alert ? 'var(--accent-rose)' : 'var(--accent-emerald)'}; font-weight:800;">${v.variancePct}</td>
-              <td>${v.alert ? '<span class="badge badge-alert">ALERT >= ±2%</span>' : '<span class="badge badge-success">NORMAL</span>'}</td>
-              <td><button class="btn-primary" style="padding:0.3rem 0.6rem; font-size:0.75rem;" onclick="triggerSupplierReorder('${v.name}')">Reorder Supplier</button></td>
+              <th>Ingredient Name</th>
+              <th>Theoretical Count</th>
+              <th>Actual Count</th>
+              <th>Variance %</th>
+              <th>Shrinkage Status</th>
+              <th>Actions</th>
             </tr>
-          `).join('')}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            ${state.inventoryVariances.map(v => `
+              <tr>
+                <td style="font-weight:700;">${v.name}</td>
+                <td style="font-family:var(--font-mono);">${v.theoretical} ${v.unit}</td>
+                <td style="font-family:var(--font-mono);">${v.actual} ${v.unit}</td>
+                <td style="font-family:var(--font-mono); color:${v.alert ? 'var(--accent-rose)' : 'var(--accent-emerald)'}; font-weight:800;">${v.variancePct}</td>
+                <td>${v.alert ? '<span class="badge badge-alert">ALERT >= ±2%</span>' : '<span class="badge badge-success">NORMAL</span>'}</td>
+                <td><button class="btn-primary" style="padding:0.35rem 0.75rem; font-size:0.75rem;" onclick="triggerSupplierReorder('${v.name}')">Reorder Supplier</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
     </div>
   `;
 }
@@ -631,44 +650,48 @@ function renderFinanceAdminWorkspace() {
         <h2 class="section-title">💳 Oracle NetSuite GL & Tip Pool Administration</h2>
         <p class="section-subtitle">Double-Entry Journal Entries (Debits = Credits) • Role-Weighted Tip Payout Allocations</p>
       </div>
-      <button class="btn-primary" style="background:var(--accent-blue);" onclick="calculateTipDistribution()">💵 Recalculate Shift Tip Pool</button>
+      <div class="header-actions">
+        <button class="btn-primary" onclick="calculateTipDistribution()">💵 Recalculate Shift Tip Pool</button>
+      </div>
     </div>
 
     <div class="grid-2">
       <!-- GL Double-Entry Table -->
       <div class="card">
         <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display); margin-bottom:1rem;">📖 NetSuite Balanced GL Journal Entry</h3>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Account Code & Name</th>
-              <th>Debit ($)</th>
-              <th>Credit ($)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style="font-weight:700;">Account 1010 (Cash/Card Tenders)</td>
-              <td style="font-family:var(--font-mono); color:var(--accent-emerald);">$41.02</td>
-              <td style="font-family:var(--font-mono);">$0.00</td>
-            </tr>
-            <tr>
-              <td>Account 4010 (Food Sales Revenue)</td>
-              <td style="font-family:var(--font-mono);">$0.00</td>
-              <td style="font-family:var(--font-mono); color:var(--accent-blue);">$37.98</td>
-            </tr>
-            <tr>
-              <td>Account 2010 (Sales Tax Payable)</td>
-              <td style="font-family:var(--font-mono);">$0.00</td>
-              <td style="font-family:var(--font-mono); color:var(--accent-blue);">$3.04</td>
-            </tr>
-            <tr style="border-top:2px solid rgba(255,255,255,0.15);">
-              <td style="font-weight:800;">GL Balanced Total</td>
-              <td style="font-family:var(--font-mono); font-weight:800; color:var(--accent-emerald);">$41.02</td>
-              <td style="font-family:var(--font-mono); font-weight:800; color:var(--accent-emerald);">$41.02</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Account Code & Name</th>
+                <th>Debit ($)</th>
+                <th>Credit ($)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="font-weight:700;">Account 1010 (Cash/Card Tenders)</td>
+                <td style="font-family:var(--font-mono); color:var(--accent-emerald);">$41.02</td>
+                <td style="font-family:var(--font-mono);">$0.00</td>
+              </tr>
+              <tr>
+                <td>Account 4010 (Food Sales Revenue)</td>
+                <td style="font-family:var(--font-mono);">$0.00</td>
+                <td style="font-family:var(--font-mono); color:var(--accent-blue);">$37.98</td>
+              </tr>
+              <tr>
+                <td>Account 2010 (Sales Tax Payable)</td>
+                <td style="font-family:var(--font-mono);">$0.00</td>
+                <td style="font-family:var(--font-mono); color:var(--accent-blue);">$3.04</td>
+              </tr>
+              <tr style="border-top:2px solid rgba(255,255,255,0.15);">
+                <td style="font-weight:800;">GL Balanced Total</td>
+                <td style="font-family:var(--font-mono); font-weight:800; color:var(--accent-emerald);">$41.02</td>
+                <td style="font-family:var(--font-mono); font-weight:800; color:var(--accent-emerald);">$41.02</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Tip Pool Calculator -->
@@ -677,53 +700,55 @@ function renderFinanceAdminWorkspace() {
         <div style="font-size:1.2rem; font-family:var(--font-mono); margin-bottom:1rem; color:var(--accent-emerald); font-weight:800;">
           Total Shift Tip Pool: $${state.tipPoolTotal.toFixed(2)}
         </div>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Employee</th>
-              <th>Role</th>
-              <th>Tip Payout</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${state.employees.map(e => `
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
               <tr>
-                <td style="font-weight:700;">${e.name}</td>
-                <td>${e.role}</td>
-                <td style="font-family:var(--font-mono); font-weight:800; color:var(--accent-emerald);">$${tipPerPerson}</td>
+                <th>Employee</th>
+                <th>Role</th>
+                <th>Tip Payout</th>
               </tr>
-            `).join('')}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              ${state.employees.map(e => `
+                <tr>
+                  <td style="font-weight:700;">${e.name}</td>
+                  <td>${e.role}</td>
+                  <td style="font-family:var(--font-mono); font-weight:800; color:var(--accent-emerald);">$${tipPerPerson}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   `;
 }
 
-// Modals
+// Modals Render Fix
 function renderModals() {
   if (!state.modalOpen) return '';
 
   if (state.modalOpen === 'add_menu_item') {
     return `
       <div class="modal-overlay" onclick="closeModal()">
-        <div class="modal-content" onclick="event.stopPropagation()" style="background:#0e1628; border:1px solid var(--border-color); border-radius:16px; padding:2rem; max-width:500px; margin:5rem auto;">
-          <h3 style="font-weight:800; font-size:1.25rem; margin-bottom:1rem;">➕ Add Master Menu Item (HQ Control)</h3>
-          <div style="margin-bottom:1rem;">
-            <label style="display:block; font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.3rem;">SKU Code</label>
-            <input type="text" id="new-sku" class="form-input" style="width:100%; padding:0.6rem; background:rgba(255,255,255,0.05); border:1px solid var(--border-color); color:white; border-radius:8px;" value="PIZ-CHZ-LG" />
+        <div class="modal-content" onclick="event.stopPropagation()">
+          <h3 style="font-weight:800; font-size:1.25rem; margin-bottom:1.25rem; font-family:var(--font-display);">➕ Add Master Menu Item (HQ Control)</h3>
+          <div class="form-group">
+            <label class="form-label">SKU Code</label>
+            <input type="text" id="new-sku" class="form-input" value="PIZ-CHZ-LG" />
           </div>
-          <div style="margin-bottom:1rem;">
-            <label style="display:block; font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.3rem;">Item Name</label>
-            <input type="text" id="new-name" class="form-input" style="width:100%; padding:0.6rem; background:rgba(255,255,255,0.05); border:1px solid var(--border-color); color:white; border-radius:8px;" value="Four Cheese Artisanal Pizza" />
+          <div class="form-group">
+            <label class="form-label">Item Name</label>
+            <input type="text" id="new-name" class="form-input" value="Four Cheese Artisanal Pizza" />
           </div>
-          <div style="margin-bottom:1rem;">
-            <label style="display:block; font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.3rem;">Base Price ($)</label>
-            <input type="number" step="0.01" id="new-price" class="form-input" style="width:100%; padding:0.6rem; background:rgba(255,255,255,0.05); border:1px solid var(--border-color); color:white; border-radius:8px;" value="17.99" />
+          <div class="form-group">
+            <label class="form-label">Base Price ($)</label>
+            <input type="number" step="0.01" id="new-price" class="form-input" value="17.99" />
           </div>
           <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.5rem;">
             <button class="btn-primary" style="background:var(--text-muted);" onclick="closeModal()">Cancel</button>
-            <button class="btn-primary" style="background:var(--accent-emerald);" onclick="saveMasterItem()">Save Master Item</button>
+            <button class="btn-primary btn-success" onclick="saveMasterItem()">Save Master Item</button>
           </div>
         </div>
       </div>
@@ -733,19 +758,19 @@ function renderModals() {
   if (state.modalOpen === 'log_spoilage') {
     return `
       <div class="modal-overlay" onclick="closeModal()">
-        <div class="modal-content" onclick="event.stopPropagation()" style="background:#0e1628; border:1px solid var(--border-color); border-radius:16px; padding:2rem; max-width:500px; margin:5rem auto;">
-          <h3 style="font-weight:800; font-size:1.25rem; margin-bottom:1rem;">🗑️ Log Kitchen Spoilage / Waste</h3>
-          <div style="margin-bottom:1rem;">
-            <label style="display:block; font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.3rem;">Item Name</label>
-            <input type="text" id="spoil-item" class="form-input" style="width:100%; padding:0.6rem; background:rgba(255,255,255,0.05); border:1px solid var(--border-color); color:white; border-radius:8px;" value="Artisanal Dough Ball 500g" />
+        <div class="modal-content" onclick="event.stopPropagation()">
+          <h3 style="font-weight:800; font-size:1.25rem; margin-bottom:1.25rem; font-family:var(--font-display);">🗑️ Log Kitchen Spoilage / Waste</h3>
+          <div class="form-group">
+            <label class="form-label">Item Name</label>
+            <input type="text" id="spoil-item" class="form-input" value="Artisanal Dough Ball 500g" />
           </div>
-          <div style="margin-bottom:1rem;">
-            <label style="display:block; font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.3rem;">Quantity Spoiled</label>
-            <input type="text" id="spoil-qty" class="form-input" style="width:100%; padding:0.6rem; background:rgba(255,255,255,0.05); border:1px solid var(--border-color); color:white; border-radius:8px;" value="3 pcs" />
+          <div class="form-group">
+            <label class="form-label">Quantity Spoiled</label>
+            <input type="text" id="spoil-qty" class="form-input" value="3 pcs" />
           </div>
-          <div style="margin-bottom:1rem;">
-            <label style="display:block; font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.3rem;">Reason Code</label>
-            <select id="spoil-reason" class="persona-select" style="width:100%; background:#0e1628; padding:0.6rem; border:1px solid var(--border-color);">
+          <div class="form-group">
+            <label class="form-label">Reason Code</label>
+            <select id="spoil-reason" class="form-input" style="background:#0f172a;">
               <option value="BURNT">BURNT IN OVEN</option>
               <option value="DROPPED_FLOOR" selected>DROPPED ON FLOOR</option>
               <option value="EXPIRED">EXPIRED PAST SHELF LIFE</option>
@@ -753,7 +778,7 @@ function renderModals() {
           </div>
           <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.5rem;">
             <button class="btn-primary" style="background:var(--text-muted);" onclick="closeModal()">Cancel</button>
-            <button class="btn-primary" style="background:var(--accent-rose);" onclick="saveSpoilageLog()">Log Spoilage</button>
+            <button class="btn-primary btn-danger" onclick="saveSpoilageLog()">Log Spoilage</button>
           </div>
         </div>
       </div>
@@ -763,26 +788,26 @@ function renderModals() {
   if (state.modalOpen === 'field_audit') {
     return `
       <div class="modal-overlay" onclick="closeModal()">
-        <div class="modal-content" onclick="event.stopPropagation()" style="background:#0e1628; border:1px solid var(--border-color); border-radius:16px; padding:2rem; max-width:500px; margin:5rem auto;">
-          <h3 style="font-weight:800; font-size:1.25rem; margin-bottom:1rem;">📱 Conduct Mobile Field Audit Inspection</h3>
-          <div style="margin-bottom:1rem;">
-            <label style="display:block; font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.3rem;">Store Unit</label>
-            <select id="audit-store" class="persona-select" style="width:100%; background:#0e1628; padding:0.6rem; border:1px solid var(--border-color);">
+        <div class="modal-content" onclick="event.stopPropagation()">
+          <h3 style="font-weight:800; font-size:1.25rem; margin-bottom:1.25rem; font-family:var(--font-display);">📱 Mobile Field Inspection Audit</h3>
+          <div class="form-group">
+            <label class="form-label">Store Unit</label>
+            <select id="audit-store" class="form-input" style="background:#0f172a;">
               <option value="Store #104 (Chicago)">Store #104 (Chicago West)</option>
               <option value="Store #101 (Downtown)">Store #101 (Downtown)</option>
             </select>
           </div>
-          <div style="margin-bottom:1rem;">
-            <label style="display:block; font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.3rem;">Inspector Name</label>
-            <input type="text" id="audit-inspector" class="form-input" style="width:100%; padding:0.6rem; background:rgba(255,255,255,0.05); border:1px solid var(--border-color); color:white; border-radius:8px;" value="Sarah Jenkins" />
+          <div class="form-group">
+            <label class="form-label">Inspector Name</label>
+            <input type="text" id="audit-inspector" class="form-input" value="Sarah Jenkins" />
           </div>
-          <div style="margin-bottom:1rem;">
-            <label style="display:block; font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.3rem;">Audit Compliance Score (%)</label>
-            <input type="number" id="audit-score" class="form-input" style="width:100%; padding:0.6rem; background:rgba(255,255,255,0.05); border:1px solid var(--border-color); color:white; border-radius:8px;" value="97" />
+          <div class="form-group">
+            <label class="form-label">Compliance Score (%)</label>
+            <input type="number" id="audit-score" class="form-input" value="97" />
           </div>
           <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.5rem;">
             <button class="btn-primary" style="background:var(--text-muted);" onclick="closeModal()">Cancel</button>
-            <button class="btn-primary" style="background:var(--accent-emerald);" onclick="saveFieldAudit()">Submit Audit Score</button>
+            <button class="btn-primary btn-success" onclick="saveFieldAudit()">Submit Audit</button>
           </div>
         </div>
       </div>
@@ -792,19 +817,19 @@ function renderModals() {
   if (state.modalOpen === 'add_shift') {
     return `
       <div class="modal-overlay" onclick="closeModal()">
-        <div class="modal-content" onclick="event.stopPropagation()" style="background:#0e1628; border:1px solid var(--border-color); border-radius:16px; padding:2rem; max-width:500px; margin:5rem auto;">
-          <h3 style="font-weight:800; font-size:1.25rem; margin-bottom:1rem;">📅 Add Shift to AI Schedule</h3>
-          <div style="margin-bottom:1rem;">
-            <label style="display:block; font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.3rem;">Employee</label>
-            <input type="text" id="shift-emp" class="form-input" style="width:100%; padding:0.6rem; background:rgba(255,255,255,0.05); border:1px solid var(--border-color); color:white; border-radius:8px;" value="John Doe" />
+        <div class="modal-content" onclick="event.stopPropagation()">
+          <h3 style="font-weight:800; font-size:1.25rem; margin-bottom:1.25rem; font-family:var(--font-display);">📅 Add Shift to AI Schedule</h3>
+          <div class="form-group">
+            <label class="form-label">Employee Name</label>
+            <input type="text" id="shift-emp" class="form-input" value="John Doe" />
           </div>
-          <div style="margin-bottom:1rem;">
-            <label style="display:block; font-size:0.85rem; color:var(--text-secondary); margin-bottom:0.3rem;">Shift Hours</label>
-            <input type="number" id="shift-hrs" class="form-input" style="width:100%; padding:0.6rem; background:rgba(255,255,255,0.05); border:1px solid var(--border-color); color:white; border-radius:8px;" value="8" />
+          <div class="form-group">
+            <label class="form-label">Shift Hours</label>
+            <input type="number" id="shift-hrs" class="form-input" value="8" />
           </div>
           <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.5rem;">
             <button class="btn-primary" style="background:var(--text-muted);" onclick="closeModal()">Cancel</button>
-            <button class="btn-primary" style="background:var(--accent-blue);" onclick="saveShift()">Add Shift</button>
+            <button class="btn-primary" onclick="saveShift()">Add Shift</button>
           </div>
         </div>
       </div>
