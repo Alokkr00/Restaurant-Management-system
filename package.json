@@ -13,20 +13,21 @@
     "test:sync-spike": "vitest run tests/sync-spike.test.ts"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "ws": "^8.17.0",
     "better-sqlite3": "^9.6.0",
-    "zod": "^3.23.8",
-    "dotenv": "^16.4.5",
     "cors": "^2.8.5",
-    "uuid": "^9.0.1"
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "uuid": "^9.0.1",
+    "ws": "^8.17.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^20.12.12",
-    "@types/ws": "^8.5.10",
-    "@types/cors": "^2.8.17",
     "@types/uuid": "^9.0.8",
+    "@types/ws": "^8.5.10",
     "tsx": "^4.10.5",
     "typescript": "^5.4.5",
     "vite": "^5.2.11",
