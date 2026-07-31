@@ -1,4 +1,4 @@
-// Enterprise Multi-Unit RMS - Production Full-Stack Web Application (Connected REST & WebSocket)
+// Enterprise Multi-Unit RMS - Production Full-Stack Web Application
 
 const EDGE_SERVER_URL = 'http://localhost:3001';
 const EDGE_WS_URL = 'ws://localhost:3001';
@@ -36,57 +36,6 @@ const state = {
     },
   ],
   cart: [],
-  // Real Architecture Evaluation & Operational Diagnostics per Persona
-  architectureDiagnostics: {
-    hq_executive: {
-      title: 'Architectural Audit: Centralized Governance vs Local Flexibility',
-      strength: 'Strict 4-tier inheritance resolution (Platform -> Brand -> Region -> Store) with brand locks.',
-      tradeOff: 'High cloud bandwidth during initial cold-start menu hydration across 100+ stores.',
-      recommendation: 'Use delta sync streams via NATS JetStream rather than full menu payload pushes.'
-    },
-    regional_director: {
-      title: 'Operational Assessment: Multi-Unit Benchmarking',
-      strength: 'Aggregates sales, labor %, and COGS % across stores in real time.',
-      tradeOff: 'Field audit scoring relies on client upload before asynchronous cloud verification.',
-      recommendation: 'Add background retry queue for low-connectivity mobile inspection uploads.'
-    },
-    franchisee: {
-      title: 'Security Audit: Multi-Tenant Data Isolation',
-      strength: 'Airtight tenant context filtering (Franchisee A returns 0 rows for Franchisee B).',
-      tradeOff: 'Tiered royalty billing requires daily NetSuite GL journal reconciliation batches.',
-      recommendation: 'Automate ACH voucher drafts via direct Webhook triggers on period close.'
-    },
-    store_gm: {
-      title: 'Compliance Evaluation: Fair Workweek & Labor Target',
-      strength: 'Automated shift blocking for clopening rest violations (< 11h) keeps labor under 22%.',
-      tradeOff: 'Manual schedule adjustments can override AI suggestions if store GM bypasses warnings.',
-      recommendation: 'Require regional director approval pin for rest guardrail overrides.'
-    },
-    kitchen_lead: {
-      title: 'Performance Benchmark: Local LAN Ticket Routing',
-      strength: 'Sub-200ms WebSocket ticket dispatch from POS to KDS on store LAN.',
-      tradeOff: 'USB scale tare zeroing requires local hardware bridge daemon.',
-      recommendation: 'Standardize WebUSB / Serial API protocol across hardware scale models.'
-    },
-    cashier: {
-      title: 'Resilience Audit: Offline Payment Vaulting',
-      strength: 'Deferred P2PE card authorization vault allows checkouts during internet outages.',
-      tradeOff: 'Hard risk caps ($100 max/tx) require manager PIN if exceeded in offline mode.',
-      recommendation: 'Pre-authorize offline credit limits based on store historical chargeback rates.'
-    },
-    procurement: {
-      title: 'Inventory Audit: Theoretical vs Actual Variance Engine',
-      strength: 'Gram-level BOM depletion with trim yield tracking auto-flags ±2% variance.',
-      tradeOff: 'Requires precise initial stock counts to prevent false variance alerts.',
-      recommendation: 'Implement daily cycle counts for high-cost protein and dairy inventory.'
-    },
-    finance_admin: {
-      title: 'ERP Integration Analysis: Double-Entry GL Ledger',
-      strength: 'Ensures strict double-entry balancing (Debits = Credits) for NetSuite GL entries.',
-      tradeOff: 'ADP payroll exports depend on third-party API availability during pay period close.',
-      recommendation: 'Implement retry queues with idempotent transaction IDs for payroll sync.'
-    }
-  }
 };
 
 // Connect to Store Edge REST API & WebSocket Stream
@@ -183,36 +132,8 @@ function renderApp() {
 
     <!-- Main View Content -->
     <main class="view-container">
-      <!-- Real Architecture Evaluation & Diagnostics Panel -->
-      ${renderArchitectureDiagnosticsPanel()}
-
-      <!-- Selected Persona View -->
       ${renderPersonaView()}
     </main>
-  `;
-}
-
-// Real System Architecture Diagnostics Panel
-function renderArchitectureDiagnosticsPanel() {
-  const diag = state.architectureDiagnostics[state.selectedPersona] || state.architectureDiagnostics.hq_executive;
-  return `
-    <div class="user-review-bar">
-      <div>
-        <div style="display:flex; align-items:center; gap:0.6rem;">
-          <span style="font-size:1.1rem;">🛠️</span>
-          <strong style="color:#ffffff; font-size:0.95rem;">${diag.title}</strong>
-          <span class="badge badge-success">REAL SYSTEM ANALYSIS</span>
-        </div>
-        <div style="font-size:0.85rem; color:var(--text-secondary); margin-top:0.35rem;">
-          <strong style="color:#34d399;">Core Strength:</strong> ${diag.strength}<br/>
-          <strong style="color:#fcd34d;">Trade-Off / Constraint:</strong> ${diag.tradeOff}<br/>
-          <strong style="color:#60a5fa;">Engineering Recommendation:</strong> ${diag.recommendation}
-        </div>
-      </div>
-      <div>
-        <span class="badge badge-locked" style="padding:0.4rem 0.8rem;">ARCHITECTURE AUDIT</span>
-      </div>
-    </div>
   `;
 }
 
