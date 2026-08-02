@@ -37,7 +37,7 @@ export interface JWTClaims {
 }
 
 export class JWTAuthService {
-  private secret: string = 'rms_enterprise_jwt_secret_2026';
+  private secret: string = process.env.JWT_SECRET || 'rms_enterprise_jwt_secret_2026';
 
   /**
    * Issues signed JWT token carrying full tenant & RBAC claims context.
