@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  store-edge-node:
+    build:
+      context: .
+      dockerfile: Dockerfile.edge
+    container_name: rms-store-edge-104
+    restart: always
+    environment:
+      - PORT=3001
+      - STORE_ID=store-104
+      - BRAND_ID=brand-pizza-co
+      - REGION_ID=region-chicago
+      - JWT_SECRET=rms_enterprise_jwt_secret_2026
+    ports:
+      - "3001:3001"
+    volumes:
+      - edge-db-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  edge-db-data:
