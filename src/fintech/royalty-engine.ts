@@ -5,6 +5,13 @@ export interface RoyaltyTier {
   royaltyRatePercent: number;
 }
 
+export interface RoyaltyDeductionPolicy {
+  allowEmployeeMealDeduction: boolean;
+  allowPromotionalCompDeduction: boolean;
+  allowManagerDiscretionaryCompDeduction: boolean;
+  allowGiftCardBreakageDeduction: boolean;
+}
+
 export interface FranchiseeRoyaltyInvoice {
   invoiceId: string;
   franchiseeId: string;
@@ -12,43 +19,82 @@ export interface FranchiseeRoyaltyInvoice {
   periodStart: string;
   periodEnd: string;
   grossSales: number;
-  netSales: number;
+  salesTaxExcluded: number;
+  compsAndDiscountsDeducted: number;
+  netRoyaltySales: number;
+  effectiveRoyaltyRate: number;
   royaltyFeeAmount: number;
+  marketingFundPercent: number;
   marketingFeeAmount: number;
   totalDueACH: number;
   generatedAt: string;
   status: 'PENDING_ACH' | 'PROCESSED' | 'FAILED';
+  deductionAuditTrail: {
+    compType: string;
+    amount: number;
+  }[];
 }
 
 export class FranchiseRoyaltyEngine {
   private marketingFundPercent: number = 2.0; // 2% Brand Marketing Contribution
   private royaltyTiers: RoyaltyTier[] = [
-    { salesThreshold: 50000, royaltyRatePercent: 5.0 }, // 5% up to 50k
-    { salesThreshold: Infinity, royaltyRatePercent: 4.5 }, // 4.5% above 50k
+    { salesThreshold: 50000, royaltyRatePercent: 5.0 }, // 5.0% up to $50k
+    { salesThreshold: Infinity, royaltyRatePercent: 4.5 }, // 4.5% above $50k
   ];
+
+  private defaultDeductionPolicy: RoyaltyDeductionPolicy = {
+    allowEmployeeMealDeduction: true,
+    allowPromotionalCompDeduction: true,
+    allowManagerDiscretionaryCompDeduction: true,
+    allowGiftCardBreakageDeduction: false,
+  };
 
   /**
    * Calculates live royalties and generates ACH invoice from POS sales.
+   * Net Royalty Sales = Gross Subtotal - Eligible Comps & Discounts.
+   * Strictly excludes Sales Tax from the royalty fee base.
    */
   public calculateRoyaltyForPeriod(
     franchiseeId: string,
     storeId: string,
     transactions: POSTransaction[],
     periodStart: string,
-    periodEnd: string
+    periodEnd: string,
+    policy: RoyaltyDeductionPolicy = this.defaultDeductionPolicy
   ): FranchiseeRoyaltyInvoice {
     const grossSales = transactions.reduce((acc, t) => acc + t.subtotal, 0);
-    // Net sales after employee meal comps or discounts
-    const netSales = grossSales; 
+    const totalTax = transactions.reduce((acc, t) => acc + t.tax, 0);
 
-    // Determine applicable tier rate
+    // Aggregate audited comps and discounts
+    let compsAndDiscountsDeducted = 0;
+    const deductionAuditTrail: { compType: string; amount: number }[] = [];
+
+    transactions.forEach((tx) => {
+      // Inspect tender comps or explicit discounts
+      tx.tenders.forEach((tender) => {
+        if (tender.type === 'COMP') {
+          if (policy.allowManagerDiscretionaryCompDeduction || policy.allowPromotionalCompDeduction) {
+            compsAndDiscountsDeducted += tender.amount;
+            deductionAuditTrail.push({
+              compType: 'MANAGER_OR_PROMO_COMP',
+              amount: tender.amount,
+            });
+          }
+        }
+      });
+    });
+
+    // Net Royalty Sales cannot be negative
+    const netRoyaltySales = Math.max(0, Number((grossSales - compsAndDiscountsDeducted).toFixed(2)));
+
+    // Tiered rate calculation based on Net Royalty Sales
     let effectiveRoyaltyRate = 5.0;
-    if (grossSales > 50000) {
+    if (netRoyaltySales > 50000) {
       effectiveRoyaltyRate = 4.5;
     }
 
-    const royaltyFeeAmount = Number(((netSales * effectiveRoyaltyRate) / 100).toFixed(2));
-    const marketingFeeAmount = Number(((netSales * this.marketingFundPercent) / 100).toFixed(2));
+    const royaltyFeeAmount = Number(((netRoyaltySales * effectiveRoyaltyRate) / 100).toFixed(2));
+    const marketingFeeAmount = Number(((netRoyaltySales * this.marketingFundPercent) / 100).toFixed(2));
     const totalDueACH = Number((royaltyFeeAmount + marketingFeeAmount).toFixed(2));
 
     return {
@@ -58,12 +104,17 @@ export class FranchiseRoyaltyEngine {
       periodStart,
       periodEnd,
       grossSales: Number(grossSales.toFixed(2)),
-      netSales: Number(netSales.toFixed(2)),
+      salesTaxExcluded: Number(totalTax.toFixed(2)),
+      compsAndDiscountsDeducted: Number(compsAndDiscountsDeducted.toFixed(2)),
+      netRoyaltySales,
+      effectiveRoyaltyRate,
       royaltyFeeAmount,
+      marketingFundPercent: this.marketingFundPercent,
       marketingFeeAmount,
       totalDueACH,
       generatedAt: new Date().toISOString(),
       status: 'PENDING_ACH',
+      deductionAuditTrail,
     };
   }
 }

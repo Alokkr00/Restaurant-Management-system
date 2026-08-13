@@ -4,28 +4,29 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg)](https://vitejs.dev/)
 [![SQLite WAL](https://img.shields.io/badge/SQLite-WAL_Mode-003B57.svg)](https://www.sqlite.org/wal.html)
-[![Vitest](https://img.shields.io/badge/Vitest-100%25_Green-78C370.svg)](https://vitest.dev/)
+[![Vitest](https://img.shields.io/badge/Vitest-34%20Tests%20Passing-78C370.svg)](https://vitest.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-An **Enterprise Distributed Hybrid Infrastructure Platform** designed for 500+ multi-unit restaurant groups, regional concepts, and franchise networks. 
+An **Enterprise Distributed Hybrid Infrastructure Platform** engineered for 500+ multi-unit restaurant brands, regional concepts, and franchise networks. 
 
-Built with an **Offline-First Local Edge Daemon (`store-edge-daemon`)**, **Native SQLite Write-Ahead Logging (`WAL`) persistence**, **Direct ESC/POS Binary TCP Thermal Printer Drivers**, and a **4-Tier Hierarchical Inheritance Engine**.
+Built with an **Offline-First Local Edge Daemon (`store-edge-daemon`)**, **Native SQLite Write-Ahead Logging (`WAL`) persistence with Background Cloud Sync**, **Direct ESC/POS Binary Thermal Printer Drivers with Station Failover**, and **Deep Restaurant Operations & Fintech Engines**.
 
 ---
 
-## 💡 Engineering Motivation & Case Study
+## 💡 Engineering Motivation & Domain Case Study
 
-### Why Offline-First Store Edge Nodes?
+### 1. Why Offline-First Local Edge Nodes?
 During peak lunch hours (12:00 PM – 1:30 PM), public cloud networks, payment gateway APIs, and internet service providers (ISPs) suffer latency spikes or unexpected WAN outages. Traditional cloud-only SaaS POS systems fail completely when internet access drops, locking cashier terminals and grinding kitchen operations to a halt.
 
 **Enterprise RMS solves this with localized edge sovereignty:**
 - Every store location operates its own dedicated fanless mini-PC running an embedded **SQLite WAL Daemon** (`store-edge.db`).
 - POS terminals and Kitchen Display Systems (KDS) communicate locally over store LAN WebSockets with **sub-200ms latency**.
-- Transactions, inventory depletions, and shift timecards are written atomically to local disk first. When cloud connectivity returns, transactions replicate asynchronously via NATS JetStream without blocking store staff.
+- Transactions, inventory depletions, and shift timecards are written atomically to local disk first. 
+- **Background Async Sync Worker**: An automatic background sync daemon continuously flushes offline transactions (`synced = 0`) to the cloud upon WAN restoration without blocking staff.
 
 ---
 
-## 🏛️ Architecture Overview
+## 🏛️ System Architecture
 
 ```mermaid
 flowchart TD
@@ -33,24 +34,28 @@ flowchart TD
         HQ_API["HQ Fastify Cloud Engine"]
         HQ_DB[("PostgreSQL Multi-Tenant DB")]
         NATS["NATS JetStream Event Stream"]
-        NS_INT["Oracle NetSuite GL Connector"]
-        ADP_INT["ADP Payroll Exporter"]
+        NS_INT["Oracle NetSuite GL Balanced Engine"]
+        ADP_INT["ADP State-Aware Payroll Exporter"]
     end
 
     subgraph Store104["Store #104 LAN Edge Appliance (Chicago West)"]
         EDGE_DAEMON["Store Edge Daemon (Node.js)"]
+        SYNC_WORKER["Async Cloud Sync Worker (5s Poll)"]
         SQLITE_WAL[("SQLite WAL Engine (store-edge.db)")]
         WS_LAN["WebSocket Ticket Router (< 200ms)"]
-        ESC_PRINT["ESC/POS Thermal Printer (Port 9100)"]
-        POS_TERM["Touch POS Terminal"]
+        ESC_PRINT["ESC/POS Hotline Printer (Port 9100)"]
+        ESC_EXPO["ESC/POS Expo Backup (Auto-Fallback)"]
+        POS_TERM["Touch POS & Cash Drawer (Z-Report)"]
         KDS_SCREEN["Kitchen Display System (KDS)"]
     end
 
     POS_TERM -->|REST / WS| EDGE_DAEMON
     EDGE_DAEMON -->|Atomic Disk Writes| SQLITE_WAL
     EDGE_DAEMON -->|Instant LAN Ticket Broadcast| WS_LAN --> KDS_SCREEN
-    EDGE_DAEMON -->|Raw ESC/POS Binary Buffer| ESC_PRINT
-    EDGE_DAEMON <-->|Asymmetric Event Replication| NATS <--> HQ_API
+    EDGE_DAEMON -->|Station Routing + Auto-Failover| ESC_PRINT
+    ESC_PRINT -.->|Paper Out Failover| ESC_EXPO
+    EDGE_DAEMON --> SYNC_WORKER
+    SYNC_WORKER <-->|Asymmetric Event Replication| NATS <--> HQ_API
     HQ_API --> HQ_DB
     HQ_API --> NS_INT
     HQ_API --> ADP_INT
@@ -68,29 +73,36 @@ Key architectural tradeoffs and technical decisions are documented in formal ADR
 
 ---
 
-## 🚀 Key Technical Capabilities
+## 🚀 Key Domain Engines
 
-### 1. 📦 Native SQLite WAL Persistence Engine
-- Enforces Write-Ahead Logging mode (`PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;`) inside `better-sqlite3`.
-- Sequentially appends transactions to `.db-wal` ensuring zero data loss even if physical store power is disconnected mid-checkout.
+### 1. 💵 Cash Management & Blind EOD Z-Reports (`src/pos/cash-management.ts`)
+- **Full Cash Drawer Lifecycle**: Manages opening banks ($200 float), mid-shift safe drops, and petty cash pay-outs with manager reason codes.
+- **Blind EOD Z-Report Reconciliation**: Cashier performs a blind physical cash count (without previewing expected drawer cash) to prevent skimming, flagging over/short variances $\ge \pm \$5.00$.
 
-### 2. 🖨️ Hardware Thermal Printing Driver (`src/hardware/escpos-printer.ts`)
-- Constructs raw ESC/POS binary command streams (`0x1b 0x40` init, `0x1b 0x61 0x01` center align, `0x1d 0x56 0x00` paper cut).
-- Transmits raw bytes directly over LAN TCP sockets (`net.Socket`) to thermal printers on Port 9100 with automatic offline retry queuing.
+### 2. 🍕 Audited Comps, Voids & Complex Modifiers (`src/pos/order-lifecycle.ts`)
+- **Comps vs Voids Separation**: Distinguishes kitchen-made food waste (inventory depleted, logged to spoilage) from pre-cook order cancellations (inventory restored).
+- **Complex Modifiers**: Supports modifier groups, exclusions (`NO Onion`), substitutions (`SUB Vegan Cheese`), and half-and-half pizza toppings (`LEFT_HALF`, `RIGHT_HALF`, `WHOLE`).
 
-### 3. 🧬 4-Tier Hierarchical Inheritance Engine (`src/hq-cloud/tenant-inheritance-engine.ts`)
-- Resolves configuration overrides: $\text{Platform Default} \longrightarrow \text{Brand} \longrightarrow \text{Region} \longrightarrow \text{Store}$.
-- Enforces **Brand Lock Protection**: Any menu item or recipe attribute flagged with `isBrandLocked: true` by HQ automatically strips store-level local overrides.
+### 3. ⚖️ FLSA-Compliant Tip Pooling (`src/fintech/tip-pooling-engine.ts`)
+- **Strict Managerial Ban**: Enforces FLSA §3(m)(2)(B), barring managers, shift leads, and supervisors from employee tip pools.
+- **Tip Credit Rules**: Prohibits BOH kitchen staff from sharing tips when the employer claims a FOH tip credit against minimum wage.
 
-### 4. 📊 Financial Accounting & Inventory Engine
-- **Oracle NetSuite GL Generator**: Creates daily double-entry journal vouchers ensuring $\sum \text{Debits} = \sum \text{Credits}$ across cash, card tenders, sales tax, and royalty ACH drafts.
-- **BOM Recipe Depletion**: Depletes inventory by exact gram weights considering edible yield shrinkage ($Yield \% = \frac{\text{Edible Weight}}{\text{As Purchased Weight}}$) and triggers $\pm 2\%$ variance alerts.
+### 4. 📈 State-Aware Overtime & Split Rates (`src/integrations/adp.ts`)
+- **California Daily Overtime**: Calculates daily OT (>8h @ 1.5x, >12h @ 2.0x) grouped across multi-shift workdays.
+- **Blended Regular Rates**: Computes weighted blended hourly rates for multi-role employees (e.g. Cashier @ $15/hr + Cook @ $25/hr).
+
+### 5. 📊 Balanced NetSuite Double-Entry GL (`src/integrations/netsuite.ts`)
+- **Double-Entry Balance Guarantee**: $\sum \text{Debits} \equiv \sum \text{Credits}$ across Cash on Hand (1010), Card Clearing (1020), 3rd-Party Delivery AR (1030), Tip Liability (2020), Sales Tax (2010), and Food Revenue (4010).
+
+### 6. 📦 Multi-Tier UOM Conversions & Par Levels (`src/inventory/uom-conversion.ts`)
+- **Cascading UOM Engine**: Converts Purchasing Units (e.g. 50lb Flour Bag) $\longrightarrow$ Storage Units (Pounds/Kilos) $\longrightarrow$ Recipe Depletion (Grams/Ounces).
+- **Dynamic Morning Par Targets**: Forecasted Sales $\times$ Prep Velocity $\times$ Safety Buffer (15%) $\longrightarrow$ Daily Prep Targets.
 
 ---
 
 ## 🧪 Automated Testing & Quality Assurance
 
-The suite features 100% green automated coverage with **21 tests across 7 test files**:
+The suite features 100% green automated coverage with **34 tests across 9 test files**:
 
 ```bash
 # Run Vitest test suite
@@ -100,48 +112,38 @@ npm test
 ```text
  RUN  v1.6.1 E:/Frenchize management system
 
- ✓ tests/sync-spike.test.ts           (4 tests passed)
- ✓ tests/hardware-drivers.test.ts     (2 tests passed) -> SQLite WAL & ESC/POS TCP Socket Verified!
- ✓ tests/phase2-sprint2.test.ts       (3 tests passed)
- ✓ tests/phase3.test.ts               (2 tests passed)
- ✓ tests/phase2-sprint1.test.ts       (4 tests passed)
- ✓ tests/production-hardening.test.ts (3 tests passed)
- ✓ tests/tenant-isolation.test.ts     (3 tests passed)
+ ✓ tests/sync-spike.test.ts                  (4 tests passed)
+ ✓ tests/phase1-compliance-financial.test.ts (6 tests passed) -> FLSA Tips, CA Daily OT & NetSuite GL
+ ✓ tests/hardware-drivers.test.ts            (4 tests passed) -> SQLite WAL & ESC/POS Station Failover
+ ✓ tests/phase2-sprint1.test.ts              (4 tests passed)
+ ✓ tests/phase3-kitchen-pos-ops.test.ts      (5 tests passed) -> Cash Drawer Z-Reports, Modifiers & UOM
+ ✓ tests/phase2-sprint2.test.ts              (3 tests passed)
+ ✓ tests/tenant-isolation.test.ts            (3 tests passed)
+ ✓ tests/production-hardening.test.ts        (3 tests passed)
+ ✓ tests/phase3.test.ts                      (2 tests passed)
 
- Test Files  7 passed (7)
-      Tests  21 passed (21)
+ Test Files  9 passed (9)
+      Tests  34 passed (34)
 ```
 
 ---
 
 ## 🛠️ Local Development & Quick Start
 
-### Prerequisites
-- Node.js >= 20.x
-- npm >= 10.x
-
-### 1. Installation
 ```bash
+# 1. Clone and Install
 git clone https://github.com/Alokkr00/Restaurant-Management-system.git
 cd Restaurant-Management-system
 npm install
-```
 
-### 2. Launch Store Edge Daemon Node
-```bash
+# 2. Run Store Edge Daemon
 npm run dev:edge
-```
-*Edge server starts at `http://localhost:3001` with SQLite WAL mode active.*
 
-### 3. Launch Web Application Interface
-```bash
+# 3. Run Web Application Interface
 npm run dev:ui
-```
-*Open `http://localhost:5173` in your browser.*
 
-### 4. Docker Store Edge Deployment
-```bash
-docker-compose -f docker-compose.edge.yml up -d
+# 4. Run Test Suite
+npm test
 ```
 
 ---

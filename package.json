@@ -13,7 +13,7 @@
     "test:sync-spike": "vitest run tests/sync-spike.test.ts"
   },
   "dependencies": {
-    "better-sqlite3": "^9.6.0",
+    "better-sqlite3": "^13.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",

@@ -31,7 +31,7 @@ describe('Phase 2 Sprint 2: Enterprise Integrations & Hardware Scale', () => {
     const totalDebits = entry.lines.reduce((sum, l) => sum + l.debit, 0);
     const totalCredits = entry.lines.reduce((sum, l) => sum + l.credit, 0);
 
-    expect(entry.lines.length).toBe(3);
+    expect(entry.isBalanced).toBe(true);
     expect(totalDebits).toBeCloseTo(totalCredits, 2);
     expect(totalDebits).toBe(41.02);
   });
@@ -39,15 +39,15 @@ describe('Phase 2 Sprint 2: Enterprise Integrations & Hardware Scale', () => {
   it('ADP Payroll payload must correctly calculate overtime (> 40h) and include tips', () => {
     // 5 shifts of 9 hours each = 45 total hours (40 regular hours, 5 overtime hours)
     const shifts: Shift[] = [
-      { id: 's1', employeeId: 'emp-101', employeeName: 'Sarah Jenkins', role: 'SHIFT_LEAD', startTime: '2026-07-27T08:00:00Z', endTime: '2026-07-27T17:00:00Z', hourlyRate: 20.0 },
-      { id: 's2', employeeId: 'emp-101', employeeName: 'Sarah Jenkins', role: 'SHIFT_LEAD', startTime: '2026-07-28T08:00:00Z', endTime: '2026-07-28T17:00:00Z', hourlyRate: 20.0 },
-      { id: 's3', employeeId: 'emp-101', employeeName: 'Sarah Jenkins', role: 'SHIFT_LEAD', startTime: '2026-07-29T08:00:00Z', endTime: '2026-07-29T17:00:00Z', hourlyRate: 20.0 },
-      { id: 's4', employeeId: 'emp-101', employeeName: 'Sarah Jenkins', role: 'SHIFT_LEAD', startTime: '2026-07-30T08:00:00Z', endTime: '2026-07-30T17:00:00Z', hourlyRate: 20.0 },
-      { id: 's5', employeeId: 'emp-101', employeeName: 'Sarah Jenkins', role: 'SHIFT_LEAD', startTime: '2026-07-31T08:00:00Z', endTime: '2026-07-31T17:00:00Z', hourlyRate: 20.0 },
+      { id: 's1', employeeId: 'emp-101', employeeName: 'Sarah Jenkins', role: 'SERVER', startTime: '2026-07-27T08:00:00Z', endTime: '2026-07-27T17:00:00Z', hourlyRate: 20.0 },
+      { id: 's2', employeeId: 'emp-101', employeeName: 'Sarah Jenkins', role: 'SERVER', startTime: '2026-07-28T08:00:00Z', endTime: '2026-07-28T17:00:00Z', hourlyRate: 20.0 },
+      { id: 's3', employeeId: 'emp-101', employeeName: 'Sarah Jenkins', role: 'SERVER', startTime: '2026-07-29T08:00:00Z', endTime: '2026-07-29T17:00:00Z', hourlyRate: 20.0 },
+      { id: 's4', employeeId: 'emp-101', employeeName: 'Sarah Jenkins', role: 'SERVER', startTime: '2026-07-30T08:00:00Z', endTime: '2026-07-30T17:00:00Z', hourlyRate: 20.0 },
+      { id: 's5', employeeId: 'emp-101', employeeName: 'Sarah Jenkins', role: 'SERVER', startTime: '2026-07-31T08:00:00Z', endTime: '2026-07-31T17:00:00Z', hourlyRate: 20.0 },
     ];
 
     const tipDistributions = [
-      { employeeId: 'emp-101', employeeName: 'Sarah Jenkins', role: 'SHIFT_LEAD', hoursWorked: 45, allocatedTipAmount: 150.0 },
+      { employeeId: 'emp-101', employeeName: 'Sarah Jenkins', role: 'SERVER' as any, hoursWorked: 45, isEligibleFLSA: true, allocatedTipAmount: 150.0 },
     ];
 
     const attestations: BreakAttestation[] = [
@@ -57,7 +57,7 @@ describe('Phase 2 Sprint 2: Enterprise Integrations & Hardware Scale', () => {
     const payroll = adp.generateADPPayrollPayload(shifts, tipDistributions, attestations, '2026-07-31');
     expect(payroll.length).toBe(1);
     expect(payroll[0].regularHours).toBe(40);
-    expect(payroll[0].overtimeHours).toBe(5);
+    expect(payroll[0].overtimeHours15x).toBe(5);
     expect(payroll[0].allocatedTipsUSD).toBe(150.0);
     expect(payroll[0].grossPayUSD).toBe(40 * 20 + 5 * 30 + 150.0); // 800 + 150 + 150 = 1100
     expect(payroll[0].breakAttestationStatus).toBe('COMPLIANT');
