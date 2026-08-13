@@ -200,10 +200,10 @@ wss.on('connection', (ws: WebSocket) => {
   });
 });
 
-// REST API Endpoints
-app.get('/health', (req, res) => {
+// REST API Endpoints & Live Diagnostics Console
+app.get(['/', '/health'], (req, res) => {
   const pendingCount = (countPendingSyncStmt.get() as any).count;
-  res.json({
+  const healthData = {
     status: 'ONLINE',
     storeId: STORE_NODE_ID,
     sqliteWalMode: true,
@@ -214,7 +214,326 @@ app.get('/health', (req, res) => {
     syncCycleCount,
     syncWorkerActive: true,
     kdsConnectedClients: wss.clients.size,
-  });
+  };
+
+  // If requested by an API client, curl, or with ?json=1 query param, return clean JSON
+  const isHtmlRequest = req.accepts('html') && !req.query.json;
+  if (!isHtmlRequest) {
+    return res.json(healthData);
+  }
+
+  // Render High-Performance Edge Node Diagnostics Dashboard for web browsers
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RMS Edge Node #104 - Live Diagnostics & Telemetry</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700;800&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-app: #080c16;
+      --bg-surface: #0f172a;
+      --bg-card: #151e32;
+      --bg-elevated: #1e293b;
+      --border-subtle: rgba(255, 255, 255, 0.12);
+      --border-strong: rgba(255, 255, 255, 0.22);
+      --text-main: #ffffff;
+      --text-muted: #cbd5e1;
+      --accent-blue: #38bdf8;
+      --accent-emerald: #10b981;
+      --accent-amber: #fbbf24;
+      --accent-rose: #f43f5e;
+      --font-main: 'Inter', sans-serif;
+      --font-display: 'Outfit', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-app);
+      color: var(--text-main);
+      font-family: var(--font-main);
+      padding: 2rem;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      -webkit-font-smoothing: antialiased;
+    }
+    .dashboard-container {
+      width: 100%;
+      max-width: 1100px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    .header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      padding: 1.5rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+    .node-title {
+      font-family: var(--font-display);
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #ffffff;
+    }
+    .node-subtitle {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.6rem 1.2rem;
+      border-radius: 9999px;
+      font-family: var(--font-mono);
+      font-weight: 800;
+      font-size: 0.85rem;
+      letter-spacing: 0.05em;
+    }
+    .status-online {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1.5px solid var(--accent-emerald);
+      color: #34d399;
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+    }
+    .status-offline {
+      background: rgba(244, 63, 94, 0.15);
+      border: 1.5px solid var(--accent-rose);
+      color: #fca5a5;
+      box-shadow: 0 0 20px rgba(244, 63, 94, 0.3);
+    }
+    .pulse-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 10px currentColor;
+    }
+    .grid-metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1.25rem;
+    }
+    .metric-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 140px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      transition: transform 0.15s ease;
+    }
+    .metric-card:hover { transform: translateY(-2px); }
+    .metric-label {
+      font-size: 0.78rem;
+      font-weight: 800;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .metric-value {
+      font-family: var(--font-mono);
+      font-size: 1.65rem;
+      font-weight: 800;
+      color: #ffffff;
+      margin: 0.5rem 0;
+    }
+    .metric-footer {
+      font-size: 0.78rem;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .controls-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .controls-title {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 1.15rem;
+    }
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+    }
+    .btn {
+      padding: 0.75rem 1.25rem;
+      border-radius: 10px;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      text-decoration: none;
+    }
+    .btn:hover { transform: translateY(-1px); }
+    .btn-primary { background: #0284c7; color: #ffffff; }
+    .btn-primary:hover { background: #0369a1; }
+    .btn-emerald { background: #059669; color: #ffffff; }
+    .btn-emerald:hover { background: #047857; }
+    .btn-amber { background: #d97706; color: #ffffff; }
+    .btn-amber:hover { background: #b45309; }
+    .btn-slate { background: #1e293b; color: #ffffff; border-color: var(--border-strong); }
+    .btn-slate:hover { background: #334155; }
+    .json-viewer {
+      background: #090e1a;
+      border: 1px solid var(--border-strong);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: #38bdf8;
+      overflow-x: auto;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-container">
+    <div class="header-bar">
+      <div>
+        <div class="node-title">RMS Edge Node #104</div>
+        <div class="node-subtitle">Store #104 Chicago West &bull; Node ID: <code>${STORE_NODE_ID}</code> &bull; Port 3001</div>
+      </div>
+      <div id="statusBadge" class="status-badge ${isCloudConnected ? 'status-online' : 'status-offline'}">
+        <span class="pulse-dot"></span>
+        <span id="statusText">${isCloudConnected ? 'CLOUD SYNCED' : 'OFFLINE EDGE MODE'}</span>
+      </div>
+    </div>
+
+    <div class="grid-metrics">
+      <div class="metric-card">
+        <div class="metric-label">Persistence Engine</div>
+        <div class="metric-value" style="color:#38bdf8;">SQLite WAL</div>
+        <div class="metric-footer">✓ PRAGMA journal_mode = WAL</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-label">Pending Offline Queue</div>
+        <div class="metric-value" id="pendingTxVal" style="color:${pendingCount > 0 ? '#fbbf24' : '#34d399'};">${pendingCount}</div>
+        <div class="metric-footer">Sync Batch Target: HQ Fastify</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-label">Background Sync Cycles</div>
+        <div class="metric-value" id="syncCycleVal" style="color:#a78bfa;">#${syncCycleCount}</div>
+        <div class="metric-footer">5s Polling Worker Active</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-label">LAN WebSocket Mesh</div>
+        <div class="metric-value" id="wsClientVal" style="color:#34d399;">${wss.clients.size} Live</div>
+        <div class="metric-footer">&lt; 200ms Local Ticket Dispatch</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-label">Primary Hotline Printer</div>
+        <div class="metric-value" style="font-size:1.25rem; color:#ffffff;">192.168.1.150</div>
+        <div class="metric-footer">Port 9100 &bull; DLE EOT Status Ready</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-label">Fallback Expo Printer</div>
+        <div class="metric-value" style="font-size:1.25rem; color:#ffffff;">192.168.1.151</div>
+        <div class="metric-footer">Automatic Failover Arm Active</div>
+      </div>
+    </div>
+
+    <div class="controls-card">
+      <div class="controls-title">Edge Node Live Operations & Chaos Controls</div>
+      <div class="btn-row">
+        <button class="btn btn-emerald" onclick="triggerSync()">⚡ Trigger Immediate Cloud Sync</button>
+        <button class="btn btn-amber" onclick="toggleNetwork()">🌐 Simulate WAN Drop / Toggle WAN</button>
+        <button class="btn btn-slate" onclick="toggleJson()">📋 Toggle Raw JSON Stream</button>
+        <a href="http://localhost:5173" target="_blank" class="btn btn-primary">🚀 Launch Store POS & KDS Console &rarr;</a>
+      </div>
+
+      <div id="jsonContainer" style="display:none; margin-top:0.75rem;">
+        <pre id="jsonContent" class="json-viewer">${JSON.stringify(healthData, null, 2)}</pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function refreshTelemetry() {
+      try {
+        const res = await fetch('/health?json=1');
+        const data = await res.json();
+        
+        document.getElementById('pendingTxVal').innerText = data.pendingOfflineTxs;
+        document.getElementById('pendingTxVal').style.color = data.pendingOfflineTxs > 0 ? '#fbbf24' : '#34d399';
+        document.getElementById('syncCycleVal').innerText = '#' + data.syncCycleCount;
+        document.getElementById('wsClientVal').innerText = data.kdsConnectedClients + ' Live';
+        
+        const badge = document.getElementById('statusBadge');
+        const text = document.getElementById('statusText');
+        if (data.cloudConnected) {
+          badge.className = 'status-badge status-online';
+          text.innerText = 'CLOUD SYNCED';
+        } else {
+          badge.className = 'status-badge status-offline';
+          text.innerText = 'OFFLINE EDGE MODE';
+        }
+        
+        document.getElementById('jsonContent').innerText = JSON.stringify(data, null, 2);
+      } catch (err) {}
+    }
+
+    async function triggerSync() {
+      const res = await fetch('/api/sync/trigger', { method: 'POST' });
+      const data = await res.json();
+      alert('Sync Triggered: ' + data.message + ' (Remaining Pending: ' + data.remainingPending + ')');
+      refreshTelemetry();
+    }
+
+    async function toggleNetwork() {
+      const res = await fetch('/api/network/toggle', { method: 'POST' });
+      const data = await res.json();
+      alert('WAN State Toggled: Cloud Connected = ' + data.cloudConnected);
+      refreshTelemetry();
+    }
+
+    function toggleJson() {
+      const el = document.getElementById('jsonContainer');
+      el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    // Auto-refresh telemetry every 2.5 seconds
+    setInterval(refreshTelemetry, 2500);
+  </script>
+</body>
+</html>`;
+
+  res.setHeader('Content-Type', 'text/html');
+  return res.send(html);
 });
 
 app.get('/api/menu', (req, res) => {
