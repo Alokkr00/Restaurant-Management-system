@@ -871,3 +871,75 @@ body {
   border-color: var(--accent-blue);
   box-shadow: var(--shadow-active);
 }
+
+/* ==========================================================================
+   4. TABLE FLOOR PLAN STYLES
+   ========================================================================== */
+.table-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1.25rem;
+}
+
+.table-card {
+  background: var(--bg-surface);
+  border: 2px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 180px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.table-card:hover {
+  transform: translateY(-2px);
+}
+
+.table-card.table-vacant {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.table-card.table-seated {
+  border-color: rgba(16, 185, 129, 0.6);
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.table-card.table-ordering {
+  border-color: rgba(245, 158, 11, 0.7);
+  background: rgba(245, 158, 11, 0.05);
+}
+
+.table-card.table-served {
+  border-color: rgba(59, 130, 246, 0.7);
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.table-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.table-label {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.2rem;
+  color: #ffffff;
+}
+
+.table-meta-row {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 0.5rem;
+}
+
+.table-actions-row {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 1rem;
+}
+

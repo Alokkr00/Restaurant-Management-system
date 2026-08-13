@@ -4,14 +4,16 @@ const EDGE_SERVER_URL = 'http://localhost:3001';
 const EDGE_WS_URL = 'ws://localhost:3001';
 
 const state = {
-  activeModule: 'pos_register', // pos_register | kds | cash_management | inventory_prep | labor_shifts | menu_catalog | franchise_financials
+  activeModule: 'pos_register', // pos_register | table_floor_plan | kds | cash_management | po_receiving | inventory_prep | labor_shifts | menu_catalog | franchise_financials
   activeCategory: 'ALL', // ALL | Pizzas | Appetizers | Beverages
   activeKDSStation: 'ALL', // ALL | HOTLINE_1 | EXPO
   storeOffline: false,
   apiConnected: false,
   wsConnected: false,
-  modalOpen: null, // null | 'add_menu_item' | 'log_spoilage' | 'cash_drop' | 'blind_z_report' | 'item_modifiers'
+  modalOpen: null, // null | 'add_menu_item' | 'log_spoilage' | 'cash_drop' | 'blind_z_report' | 'item_modifiers' | 'seat_table' | 'create_po' | 'receive_grn' | 'run_stock_take'
   selectedModifierItem: null,
+  selectedTable: null,
+  selectedPO: null,
   activeModifiers: [],
   selectedTaxJurisdiction: 'US_SALES_TAX',
   
@@ -25,6 +27,38 @@ const state = {
     expectedCashUSD: 430.0,
     status: 'OPEN',
   },
+
+  // Tables State
+  tables: [
+    { tableId: 'tbl-1', label: 'Table 1', seats: 2, section: 'Main Floor', status: 'VACANT' },
+    { tableId: 'tbl-2', label: 'Table 2', seats: 4, section: 'Main Floor', status: 'SEATED', openTicketId: 'TKT-TBL-2-001', covers: 3, serverName: 'Sarah J.', seatedAt: '12:30 PM' },
+    { tableId: 'tbl-3', label: 'Table 3', seats: 4, section: 'Main Floor', status: 'ORDERING', openTicketId: 'TKT-TBL-3-002', covers: 4, serverName: 'John D.', seatedAt: '12:45 PM' },
+    { tableId: 'tbl-4', label: 'Table 4', seats: 6, section: 'Main Floor', status: 'SERVED', openTicketId: 'TKT-TBL-4-003', covers: 5, serverName: 'Michael S.', seatedAt: '12:15 PM' },
+    { tableId: 'tbl-5', label: 'Table 5', seats: 2, section: 'Main Floor', status: 'VACANT' },
+    { tableId: 'tbl-6', label: 'Table 6', seats: 8, section: 'Private Dining', status: 'VACANT' },
+    { tableId: 'bar-1', label: 'Bar 1', seats: 1, section: 'Bar', status: 'VACANT' },
+    { tableId: 'bar-2', label: 'Bar 2', seats: 1, section: 'Bar', status: 'VACANT' },
+    { tableId: 'pat-1', label: 'Patio 1', seats: 4, section: 'Patio', status: 'VACANT' },
+    { tableId: 'pat-2', label: 'Patio 2', seats: 4, section: 'Patio', status: 'VACANT' },
+  ],
+
+  // Purchase Orders & Inventory Receiving
+  purchaseOrders: [
+    { poId: 'PO-STORE-104-001', supplierId: 'sup-001', supplierName: 'Mumbai Dairy Wholesalers Pvt. Ltd.', totalCostINR: 13000, status: 'SENT', createdAt: '2026-08-14', expectedDeliveryDate: '2026-08-18' },
+    { poId: 'PO-STORE-104-002', supplierId: 'sup-002', supplierName: 'Delhi Grain & Flour Mills', totalCostINR: 2250, status: 'RECEIVED', createdAt: '2026-08-12', expectedDeliveryDate: '2026-08-13' },
+  ],
+
+  suppliers: [
+    { supplierId: 'sup-001', name: 'Mumbai Dairy Wholesalers Pvt. Ltd.', phone: '+91-98201-11223', leadTimeDays: 2, paymentTermsDays: 30 },
+    { supplierId: 'sup-002', name: 'Delhi Grain & Flour Mills', phone: '+91-99100-44556', leadTimeDays: 1, paymentTermsDays: 15 },
+  ],
+
+  stockLevels: [
+    { ingredientId: 'ing-cheese', name: 'Mozzarella Cheese (Shredded)', balance: 15.8, unit: 'kg' },
+    { ingredientId: 'ing-pep', name: 'Pepperoni Slices (Beef/Pork)', balance: 8.6, unit: 'kg' },
+    { ingredientId: 'ing-flour', name: 'High-Gluten Flour Batch', balance: 48.2, unit: 'kg' },
+    { ingredientId: 'ing-sauce', name: 'Tomato Pizza Sauce', balance: 12.0, unit: 'kg' },
+  ],
 
   menuItems: [
     { id: 'item-101', sku: 'PIZ-PEP-LG', name: 'Large Pepperoni Pizza', category: 'Pizzas', basePrice: 18.99, image: '/pepperoni_pizza.jpg', allergens: ['DAIRY', 'GLUTEN'], isBrandLocked: true, version: 3 },
@@ -116,15 +150,15 @@ async function initBackendConnection() {
       if (data.type === 'KDS_NEW_TICKET') {
         state.kdsTickets.unshift({
           id: data.ticket.id,
-          source: 'POS Terminal 01',
-          station: 'HOTLINE_1',
+          source: data.ticket.source || 'POS Terminal 01',
+          station: data.ticket.station || 'HOTLINE_1',
           elapsedMinutes: 0,
           elapsedSeconds: 15,
           diningType: 'DINE IN',
           items: data.ticket.items.map(i => ({ 
             qty: i.quantity || 1, 
             name: i.menuItemId === 'item-101' ? 'Large Pepperoni Pizza' : 'Spicy Buffalo Wings',
-            modifiers: ['Standard Prep']
+            modifiers: i.modifiers || ['Standard Prep']
           })),
           status: 'IN_PREP',
         });
@@ -150,8 +184,10 @@ function renderApp() {
       <!-- Module Navigation Tabs -->
       <nav class="module-nav">
         <button class="nav-tab ${state.activeModule === 'pos_register' ? 'active' : ''}" onclick="selectModule('pos_register')">POS Register</button>
+        <button class="nav-tab ${state.activeModule === 'table_floor_plan' ? 'active' : ''}" onclick="selectModule('table_floor_plan')">Table Floor (${state.tables.filter(t => t.status !== 'VACANT').length}/${state.tables.length})</button>
         <button class="nav-tab ${state.activeModule === 'kds' ? 'active' : ''}" onclick="selectModule('kds')">Kitchen KDS (${state.kdsTickets.length})</button>
         <button class="nav-tab ${state.activeModule === 'cash_management' ? 'active' : ''}" onclick="selectModule('cash_management')">Cash & Drawers</button>
+        <button class="nav-tab ${state.activeModule === 'po_receiving' ? 'active' : ''}" onclick="selectModule('po_receiving')">PO Receiving (${state.purchaseOrders.length})</button>
         <button class="nav-tab ${state.activeModule === 'inventory_prep' ? 'active' : ''}" onclick="selectModule('inventory_prep')">Inventory & Prep</button>
         <button class="nav-tab ${state.activeModule === 'labor_shifts' ? 'active' : ''}" onclick="selectModule('labor_shifts')">Labor & Shifts</button>
         <button class="nav-tab ${state.activeModule === 'menu_catalog' ? 'active' : ''}" onclick="selectModule('menu_catalog')">Menu Catalog</button>
@@ -178,8 +214,10 @@ function renderApp() {
 function renderActiveModule() {
   switch (state.activeModule) {
     case 'pos_register': return renderPOSRegisterWorkspace();
+    case 'table_floor_plan': return renderTableFloorPlanWorkspace();
     case 'kds': return renderKDSWorkspace();
     case 'cash_management': return renderCashManagementWorkspace();
+    case 'po_receiving': return renderPOReceivingWorkspace();
     case 'inventory_prep': return renderInventoryPrepWorkspace();
     case 'labor_shifts': return renderLaborShiftsWorkspace();
     case 'menu_catalog': return renderMenuCatalogWorkspace();
@@ -317,7 +355,164 @@ function renderPOSRegisterWorkspace() {
   `;
 }
 
-// 2. KITCHEN DISPLAY SYSTEM (KDS)
+// 2. TABLE FLOOR PLAN WORKSPACE
+function renderTableFloorPlanWorkspace() {
+  return `
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Table Floor Plan & Dining Management</h2>
+        <p class="section-subtitle">Course Hold/Fire &bull; Table Transfers &bull; Covers & Server Assignments</p>
+      </div>
+      <div class="header-actions">
+        <span class="badge badge-online">${state.tables.filter(t => t.status !== 'VACANT').length} OCCUPIED / ${state.tables.length} TABLES</span>
+      </div>
+    </div>
+
+    <!-- Table Grid Layout -->
+    <div class="table-grid">
+      ${state.tables.map(table => {
+        const statusClass = table.status === 'VACANT' ? 'table-vacant' : table.status === 'SEATED' ? 'table-seated' : table.status === 'ORDERING' ? 'table-ordering' : 'table-served';
+        const badgeClass = table.status === 'VACANT' ? 'badge-online' : table.status === 'SEATED' ? 'badge-online' : table.status === 'ORDERING' ? 'badge-warning' : 'badge-locked';
+
+        return `
+          <div class="table-card ${statusClass}">
+            <div>
+              <div class="table-header-row">
+                <span class="table-label">${table.label}</span>
+                <span class="badge ${badgeClass}">${table.status}</span>
+              </div>
+              <div class="table-meta-row">
+                <div><strong>${table.section}</strong> &bull; ${table.seats} Seats</div>
+                ${table.covers ? `<div style="margin-top:0.25rem; color:#ffffff;">${table.covers} Covers &bull; ${table.serverName}</div>` : '<div style="margin-top:0.25rem; color:var(--text-muted);">Ready to seat</div>'}
+                ${table.seatedAt ? `<div style="font-size:0.72rem; color:var(--accent-blue); margin-top:0.15rem;">Seated: ${table.seatedAt}</div>` : ''}
+              </div>
+            </div>
+
+            <div class="table-actions-row">
+              ${table.status === 'VACANT' ? `
+                <button class="btn-primary btn-emerald" style="width:100%; min-height:38px; font-size:0.82rem;" onclick="openSeatTableModal('${table.tableId}')">
+                  Seat Party +
+                </button>
+              ` : `
+                <button class="btn-primary btn-amber" style="flex:1; min-height:38px; font-size:0.8rem;" onclick="fireCourseForTable('${table.tableId}')">
+                  Fire Course &rarr;
+                </button>
+                <button class="btn-primary btn-rose" style="flex:1; min-height:38px; font-size:0.8rem;" onclick="closeTableCheckout('${table.tableId}')">
+                  Bill & Close
+                </button>
+              `}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+// 3. PURCHASE ORDER & INVENTORY RECEIVING WORKSPACE
+function renderPOReceivingWorkspace() {
+  return `
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Purchase Orders & Goods Receiving (GRN)</h2>
+        <p class="section-subtitle">Supplier Management &bull; Short Delivery Tracking &bull; Physical Stock Take Reconciliation</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn-primary btn-slate" onclick="openModal('run_stock_take')">Run Stock-Take Count</button>
+        <button class="btn-primary btn-emerald" onclick="openModal('create_po')">Create Purchase Order +</button>
+      </div>
+    </div>
+
+    <!-- Stock Balances Summary -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
+      ${state.stockLevels.map(s => `
+        <div class="card">
+          <div style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">${s.name}</div>
+          <div style="font-family:var(--font-mono); font-size:1.5rem; font-weight:800; color:#34d399; margin-top:0.25rem;">
+            ${s.balance} <span style="font-size:0.9rem; color:var(--text-muted);">${s.unit}</span>
+          </div>
+          <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem;">Stock on hand (ledger verified)</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <!-- Purchase Orders Table -->
+    <div class="card" style="margin-bottom:1.5rem;">
+      <h3 style="font-size:1.1rem; font-weight:800; margin-bottom:1rem;">Purchase Orders Registry</h3>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>PO Number</th>
+              <th>Supplier</th>
+              <th>Created Date</th>
+              <th>Expected Date</th>
+              <th>Total Cost</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${state.purchaseOrders.map(po => `
+              <tr>
+                <td><code>${po.poId}</code></td>
+                <td><strong>${po.supplierName}</strong></td>
+                <td>${po.createdAt}</td>
+                <td>${po.expectedDeliveryDate}</td>
+                <td style="font-family:var(--font-mono); font-weight:700;">₹${po.totalCostINR.toLocaleString()}</td>
+                <td>
+                  <span class="badge ${po.status === 'RECEIVED' ? 'badge-online' : po.status === 'SENT' ? 'badge-warning' : 'badge-locked'}">
+                    ${po.status}
+                  </span>
+                </td>
+                <td>
+                  ${po.status !== 'RECEIVED' ? `
+                    <button class="btn-primary btn-emerald" style="padding:0.35rem 0.75rem; font-size:0.75rem;" onclick="openReceiveGRNModal('${po.poId}')">
+                      Receive GRN &rarr;
+                    </button>
+                  ` : `
+                    <span style="color:#34d399; font-size:0.8rem; font-weight:700;">Stock Incremented ✓</span>
+                  `}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Suppliers Table -->
+    <div class="card">
+      <h3 style="font-size:1.1rem; font-weight:800; margin-bottom:1rem;">Registered Wholesale Suppliers</h3>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Supplier ID</th>
+              <th>Company Name</th>
+              <th>Phone</th>
+              <th>Lead Time</th>
+              <th>Payment Terms</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${state.suppliers.map(sup => `
+              <tr>
+                <td><code>${sup.supplierId}</code></td>
+                <td><strong>${sup.name}</strong></td>
+                <td>${sup.phone}</td>
+                <td>${sup.leadTimeDays} Days</td>
+                <td>Net ${sup.paymentTermsDays} Days</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// 4. KITCHEN DISPLAY SYSTEM (KDS)
 function renderKDSWorkspace() {
   const filteredTickets = state.activeKDSStation === 'ALL'
     ? state.kdsTickets
@@ -385,7 +580,7 @@ function renderKDSWorkspace() {
   `;
 }
 
-// 3. CASH MANAGEMENT & SHIFT RECONCILIATION
+// 5. CASH MANAGEMENT & SHIFT RECONCILIATION
 function renderCashManagementWorkspace() {
   return `
     <div class="section-header">
@@ -466,7 +661,7 @@ function renderCashManagementWorkspace() {
   `;
 }
 
-// 4. INVENTORY & PREP
+// 6. INVENTORY & PREP
 function renderInventoryPrepWorkspace() {
   return `
     <div class="section-header">
@@ -548,7 +743,7 @@ function renderInventoryPrepWorkspace() {
   `;
 }
 
-// 5. LABOR & SHIFTS
+// 7. LABOR & SHIFTS
 function renderLaborShiftsWorkspace() {
   return `
     <div class="section-header">
@@ -596,7 +791,7 @@ function renderLaborShiftsWorkspace() {
   `;
 }
 
-// 6. MENU CATALOG
+// 8. MENU CATALOG
 function renderMenuCatalogWorkspace() {
   return `
     <div class="section-header">
@@ -641,7 +836,7 @@ function renderMenuCatalogWorkspace() {
   `;
 }
 
-// 7. FINANCIALS & GL
+// 9. FINANCIALS & GL
 function renderFinancialsWorkspace() {
   return `
     <div class="section-header">
@@ -740,6 +935,40 @@ window.openModifierModal = function(id) {
   state.selectedModifierItem = item;
   state.activeModifiers = [];
   openModal('item_modifiers');
+};
+
+window.openSeatTableModal = function(tableId) {
+  const table = state.tables.find(t => t.tableId === tableId);
+  if (!table) return;
+  state.selectedTable = table;
+  openModal('seat_table');
+};
+
+window.fireCourseForTable = function(tableId) {
+  const table = state.tables.find(t => t.tableId === tableId);
+  if (!table) return;
+  table.status = 'SERVED';
+  alert(`Course fired to KDS for ${table.label}. Kitchen station received ticket over LAN WebSocket.`);
+  renderApp();
+};
+
+window.closeTableCheckout = function(tableId) {
+  const table = state.tables.find(t => t.tableId === tableId);
+  if (!table) return;
+  table.status = 'VACANT';
+  delete table.openTicketId;
+  delete table.covers;
+  delete table.serverName;
+  delete table.seatedAt;
+  alert(`${table.label} bill settled via Cash. Table reset to VACANT.`);
+  renderApp();
+};
+
+window.openReceiveGRNModal = function(poId) {
+  const po = state.purchaseOrders.find(p => p.poId === poId);
+  if (!po) return;
+  state.selectedPO = po;
+  openModal('receive_grn');
 };
 
 window.toggleModifierOption = function(modName, price) {
@@ -856,11 +1085,185 @@ window.openModal = function(m) {
 window.closeModal = function() {
   state.modalOpen = null;
   state.selectedModifierItem = null;
+  state.selectedTable = null;
+  state.selectedPO = null;
   renderApp();
 };
 
 function renderModals() {
   if (!state.modalOpen) return '';
+
+  if (state.modalOpen === 'seat_table' && state.selectedTable) {
+    const table = state.selectedTable;
+    return `
+      <div class="modal-overlay" onclick="closeModal()">
+        <div class="modal-card" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <div>
+              <h3 style="font-size:1.15rem; font-weight:800;">Seat ${table.label} (${table.seats} Seats)</h3>
+              <span style="font-size:0.8rem; color:var(--text-muted);">${table.section}</span>
+            </div>
+            <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+          </div>
+
+          <form onsubmit="
+            event.preventDefault();
+            const covers = Number(document.getElementById('seatCoversInput').value);
+            const server = document.getElementById('serverNameInput').value;
+            state.selectedTable.status = 'SEATED';
+            state.selectedTable.covers = covers;
+            state.selectedTable.serverName = server;
+            state.selectedTable.seatedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            alert('${table.label} seated with ' + covers + ' covers assigned to ' + server + '. Ticket opened.');
+            closeModal();
+          ">
+            <div class="form-group">
+              <label>Number of Guests (Covers &le; ${table.seats})</label>
+              <input type="number" id="seatCoversInput" class="form-control" min="1" max="${table.seats}" value="2" required />
+            </div>
+            <div class="form-group">
+              <label>Assigned Server</label>
+              <input type="text" id="serverNameInput" class="form-control" value="Sarah Jenkins" required />
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.5rem;">
+              <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
+              <button type="submit" class="btn-primary btn-emerald">Open Table Ticket</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+  }
+
+  if (state.modalOpen === 'create_po') {
+    return `
+      <div class="modal-overlay" onclick="closeModal()">
+        <div class="modal-card" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <div>
+              <h3 style="font-size:1.15rem; font-weight:800;">Create Purchase Order (PO)</h3>
+              <span style="font-size:0.8rem; color:var(--text-muted);">Supplier Order Requisition</span>
+            </div>
+            <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+          </div>
+
+          <form onsubmit="
+            event.preventDefault();
+            const poNumber = 'PO-STORE-104-00' + (state.purchaseOrders.length + 1);
+            state.purchaseOrders.unshift({
+              poId: poNumber,
+              supplierId: 'sup-001',
+              supplierName: 'Mumbai Dairy Wholesalers Pvt. Ltd.',
+              totalCostINR: 13000,
+              status: 'SENT',
+              createdAt: new Date().toISOString().substring(0, 10),
+              expectedDeliveryDate: '2026-08-20'
+            });
+            alert('Purchase Order ' + poNumber + ' created and marked SENT.');
+            closeModal();
+          ">
+            <div class="form-group">
+              <label>Wholesale Supplier</label>
+              <select class="form-control">
+                <option>Mumbai Dairy Wholesalers Pvt. Ltd. (Mozzarella Cheese)</option>
+                <option>Delhi Grain & Flour Mills (High-Gluten Flour)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Order Item & Quantity</label>
+              <input type="text" class="form-control" value="Mozzarella Cheese - 20 kg @ ₹650/kg" required />
+            </div>
+            <div class="form-group">
+              <label>Expected Delivery Date</label>
+              <input type="date" class="form-control" value="2026-08-20" required />
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.5rem;">
+              <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
+              <button type="submit" class="btn-primary btn-emerald">Dispatch PO</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+  }
+
+  if (state.modalOpen === 'receive_grn' && state.selectedPO) {
+    const po = state.selectedPO;
+    return `
+      <div class="modal-overlay" onclick="closeModal()">
+        <div class="modal-card" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <div>
+              <h3 style="font-size:1.15rem; font-weight:800;">Receive GRN for ${po.poId}</h3>
+              <span style="font-size:0.8rem; color:var(--text-muted);">${po.supplierName}</span>
+            </div>
+            <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+          </div>
+
+          <form onsubmit="
+            event.preventDefault();
+            po.status = 'RECEIVED';
+            const cheese = state.stockLevels.find(s => s.ingredientId === 'ing-cheese');
+            if (cheese) cheese.balance += 20;
+            alert('Goods Receipt Note (GRN) posted. Stock incremented by 20 kg. PO marked RECEIVED.');
+            closeModal();
+          ">
+            <div class="form-group">
+              <label>Received Mozzarella Cheese (kg)</label>
+              <input type="number" step="0.1" class="form-control" value="20.0" required />
+            </div>
+            <div class="form-group">
+              <label>Receiving Staff Member</label>
+              <input type="text" class="form-control" value="Warehouse Staff Lead" required />
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.5rem;">
+              <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
+              <button type="submit" class="btn-primary btn-emerald">Post GRN & Increment Stock</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+  }
+
+  if (state.modalOpen === 'run_stock_take') {
+    return `
+      <div class="modal-overlay" onclick="closeModal()">
+        <div class="modal-card" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <div>
+              <h3 style="font-size:1.15rem; font-weight:800;">Blind Physical Stock-Take</h3>
+              <span style="font-size:0.8rem; color:var(--text-muted);">Reconciliation against running balance</span>
+            </div>
+            <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+          </div>
+
+          <form onsubmit="
+            event.preventDefault();
+            alert('Physical Stock-Take submitted. Mozzarella variance +0.5 kg (+3.1% - flagged for review). Pepperoni in range.');
+            closeModal();
+          ">
+            <div class="form-group">
+              <label>Mozzarella Cheese Physical Count (kg)</label>
+              <input type="number" step="0.1" class="form-control" value="16.3" required />
+            </div>
+            <div class="form-group">
+              <label>Pepperoni Physical Count (kg)</label>
+              <input type="number" step="0.1" class="form-control" value="8.6" required />
+            </div>
+            <div class="form-group">
+              <label>Flour Physical Count (kg)</label>
+              <input type="number" step="0.1" class="form-control" value="48.0" required />
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.5rem;">
+              <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
+              <button type="submit" class="btn-primary btn-emerald">Compute Variances</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+  }
 
   if (state.modalOpen === 'item_modifiers' && state.selectedModifierItem) {
     const item = state.selectedModifierItem;

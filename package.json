@@ -10,7 +10,8 @@
     "dev:ui": "vite",
     "build": "tsc && vite build",
     "test": "vitest run",
-    "test:sync-spike": "vitest run tests/sync-spike.test.ts"
+    "test:load": "tsx tests/load/concurrent-orders.ts",
+    "test:chaos": "tsx tests/load/offline-chaos.ts"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

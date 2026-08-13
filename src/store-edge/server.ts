@@ -8,6 +8,8 @@ import { POSTransaction, MenuItem } from '../shared/types.js';
 import { ESCPOSThermalPrinterDriver, PrinterStationConfig } from '../hardware/escpos-printer.js';
 import { JWTAuthService } from '../security/tenant-context.js';
 import { InventoryRecipeEngine } from '../inventory/recipe-engine.js';
+import { TableFloorPlanEngine } from '../pos/table-floor-plan.js';
+import { PurchaseOrderEngine } from '../inventory/purchase-order-engine.js';
 
 const app = express();
 app.use(cors());
@@ -20,6 +22,8 @@ const STORE_NODE_ID = process.env.STORE_ID || 'store-104';
 const printerDriver = new ESCPOSThermalPrinterDriver();
 const recipeEngine = new InventoryRecipeEngine();
 const authService = new JWTAuthService();
+const floorPlanEngine = new TableFloorPlanEngine();
+const poEngine = new PurchaseOrderEngine();
 
 // Initialize Physical SQLite Engine in Write-Ahead Logging (WAL) Mode
 const dbPath = path.resolve(process.cwd(), 'store-edge.db');
@@ -240,75 +244,208 @@ app.post('/api/network/toggle', (req, res) => {
   res.json({ success: true, cloudConnected: isCloudConnected });
 });
 
-app.post('/api/pos/checkout', async (req, res) => {
-  const tx: POSTransaction = req.body;
-  tx.storeId = STORE_NODE_ID;
-  tx.synced = isCloudConnected;
-  tx.offlineMode = !isCloudConnected;
+// ─── Table Floor Plan Endpoints ──────────────────────────────────────────
+app.get('/api/tables', (req, res) => {
+  res.json({ success: true, tables: floorPlanEngine.getFloorPlan() });
+});
 
-  // Persist to physical SQLite WAL database atomically
-  insertTxStmt.run(
-    tx.id,
-    STORE_NODE_ID,
-    tx.terminalId || 'pos-1',
-    tx.timestamp || new Date().toISOString(),
-    JSON.stringify(tx),
-    tx.subtotal,
-    tx.tax,
-    tx.total,
-    isCloudConnected ? 1 : 0,
-    isCloudConnected ? 0 : 1
-  );
+app.post('/api/tables/seat', (req, res) => {
+  try {
+    const { tableId, covers, serverName } = req.body;
+    const ticket = floorPlanEngine.seatTable(tableId, covers, serverName || 'Server 1', STORE_NODE_ID);
+    res.json({ success: true, ticket });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
 
-  // Dispatch to Thermal Printer with Station Fallback
-  const printResult = await printerDriver.printWithFallback(
-    primaryHotlinePrinter,
-    fallbackExpoPrinter,
-    {
-      storeName: 'Store #104 Chicago West',
-      ticketId: tx.id,
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      items: tx.items.map((i) => ({
-        name: i.menuItemId === 'item-101' ? 'Large Pepperoni Pizza' : 'Spicy Buffalo Wings',
-        qty: i.quantity,
-        price: i.unitPrice,
-      })),
-      subtotal: tx.subtotal,
-      tax: tx.tax,
-      total: tx.total,
-    }
-  );
+app.post('/api/tables/hold', (req, res) => {
+  try {
+    const { ticketId, items } = req.body;
+    const ticket = floorPlanEngine.holdItems(ticketId, items);
+    res.json({ success: true, ticket });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
 
-  // If printing had to fallback, notify KDS / Terminals
-  if (printResult.wasRerouted) {
+app.post('/api/tables/fire', (req, res) => {
+  try {
+    const { ticketId } = req.body;
+    const result = floorPlanEngine.fireCourse(ticketId);
+
+    // Broadcast fired items to KDS over LAN WebSockets
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(
-          JSON.stringify({
-            type: 'HARDWARE_ALERT',
-            level: 'WARNING',
-            message: printResult.message,
-          })
-        );
+        client.send(JSON.stringify({
+          type: 'KDS_NEW_TICKET',
+          ticket: {
+            id: ticketId,
+            source: 'Table Floor Service',
+            station: 'HOTLINE_1',
+            items: result.firedItems.map(i => ({
+              menuItemId: i.menuItemId,
+              quantity: i.quantity,
+              unitPrice: 10,
+              modifiers: i.modifiers || [],
+            })),
+            subtotal: 0,
+            tax: 0,
+            total: 0,
+            tenders: [],
+            offlineMode: !isCloudConnected,
+            synced: isCloudConnected,
+          }
+        }));
       }
     });
+
+    res.json({ success: true, result });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
   }
+});
 
-  // Broadcast ticket over LAN WebSocket (< 200ms)
-  wss.clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify({ type: 'KDS_NEW_TICKET', ticket: tx }));
+app.post('/api/tables/transfer', (req, res) => {
+  try {
+    const { fromTableId, toTableId, authorizedBy } = req.body;
+    const record = floorPlanEngine.transferTable(fromTableId, toTableId, authorizedBy || 'Manager');
+    res.json({ success: true, record });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/tables/close', (req, res) => {
+  try {
+    const { tableId, payments } = req.body;
+    const result = floorPlanEngine.closeTable(tableId, payments || [{ type: 'CASH', amount: 999 }]);
+    res.json({ success: true, result });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// ─── Purchase Order & Inventory Endpoints ────────────────────────────────
+app.get('/api/inventory/suppliers', (req, res) => {
+  res.json({ success: true, suppliers: poEngine.listSuppliers() });
+});
+
+app.get('/api/inventory/pos', (req, res) => {
+  res.json({ success: true, purchaseOrders: poEngine.listPurchaseOrders(STORE_NODE_ID) });
+});
+
+app.post('/api/inventory/pos', (req, res) => {
+  try {
+    const { supplierId, lineItems, expectedDeliveryDate, notes } = req.body;
+    const po = poEngine.createPurchaseOrder(supplierId, STORE_NODE_ID, lineItems, expectedDeliveryDate, notes);
+    res.json({ success: true, purchaseOrder: po });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/inventory/pos/receive', (req, res) => {
+  try {
+    const { poId, receivedBy, actualReceived } = req.body;
+    const grn = poEngine.receivePurchaseOrder(poId, receivedBy || 'Store Staff', actualReceived);
+    res.json({ success: true, grn });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/inventory/stock', (req, res) => {
+  res.json({ success: true, stockLevels: poEngine.getStockLevels() });
+});
+
+app.post('/api/inventory/stock-take', (req, res) => {
+  try {
+    const { counts } = req.body;
+    const variances = poEngine.runStockTake(STORE_NODE_ID, counts);
+    res.json({ success: true, variances });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/pos/checkout', async (req, res) => {
+  try {
+    const tx: POSTransaction = req.body;
+    tx.storeId = STORE_NODE_ID;
+    tx.synced = isCloudConnected;
+    tx.offlineMode = !isCloudConnected;
+
+    // Persist to physical SQLite WAL database atomically
+    insertTxStmt.run(
+      tx.id,
+      STORE_NODE_ID,
+      tx.terminalId || 'pos-1',
+      tx.timestamp || new Date().toISOString(),
+      JSON.stringify(tx),
+      tx.subtotal,
+      tx.tax,
+      tx.total,
+      isCloudConnected ? 1 : 0,
+      isCloudConnected ? 0 : 1
+    );
+
+    // Dispatch to Thermal Printer with Station Fallback
+    const printResult = await printerDriver.printWithFallback(
+      primaryHotlinePrinter,
+      fallbackExpoPrinter,
+      {
+        storeName: 'Store #104 Chicago West',
+        ticketId: tx.id,
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        items: tx.items.map((i) => ({
+          name: i.menuItemId === 'item-101' ? 'Large Pepperoni Pizza' : 'Spicy Buffalo Wings',
+          qty: i.quantity,
+          price: i.unitPrice,
+        })),
+        subtotal: tx.subtotal,
+        tax: tx.tax,
+        total: tx.total,
+      }
+    );
+
+    // If printing had to fallback, notify KDS / Terminals
+    if (printResult.wasRerouted) {
+      wss.clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(
+            JSON.stringify({
+              type: 'HARDWARE_ALERT',
+              level: 'WARNING',
+              message: printResult.message,
+            })
+          );
+        }
+      });
     }
-  });
 
-  res.status(200).json({
-    success: true,
-    transactionId: tx.id,
-    storeId: STORE_NODE_ID,
-    sqliteWalPersisted: true,
-    printerResult: printResult,
-    mode: tx.offlineMode ? 'OFFLINE_DEFERRED_AUTH' : 'ONLINE_AUTH',
-  });
+    // Broadcast ticket over LAN WebSocket (< 200ms)
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify({ type: 'KDS_NEW_TICKET', ticket: tx }));
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      transactionId: tx.id,
+      storeId: STORE_NODE_ID,
+      sqliteWalPersisted: true,
+      printerResult: printResult,
+      mode: tx.offlineMode ? 'OFFLINE_DEFERRED_AUTH' : 'ONLINE_AUTH',
+    });
+  } catch (err: any) {
+    if (err.message && err.message.includes('UNIQUE constraint failed')) {
+      res.status(409).json({ success: false, error: 'Duplicate transaction ID', id: req.body?.id });
+    } else {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
 });
 
 const PORT = process.env.PORT || 3001;

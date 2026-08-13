@@ -4,7 +4,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg)](https://vitejs.dev/)
 [![SQLite WAL](https://img.shields.io/badge/SQLite-WAL_Mode-003B57.svg)](https://www.sqlite.org/wal.html)
-[![Vitest](https://img.shields.io/badge/Vitest-26%20Tests%20Passing-78C370.svg)](https://vitest.dev/)
+[![Vitest](https://img.shields.io/badge/Vitest-38%20Tests%20Passing-78C370.svg)](https://vitest.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 A hybrid on-premise and cloud restaurant management system designed for multi-unit franchise networks and restaurant holding groups.
@@ -85,45 +85,33 @@ Detailed technical decisions and architectural tradeoffs are documented in the `
 ### 3. FLSA Tip Pooling Compliance (`src/fintech/tip-pooling-engine.ts`)
 - Enforces FLSA Section 3(m)(2)(B) excluding managers and shift leads with supervisory authority from tip pools.
 - Enforces tip credit regulations restricting back-of-house staff from tip pools when an employer claims a tip credit against minimum wage.
-
-### 4. Overtime & Blended Pay Rates (`src/integrations/adp.ts`)
-- Implements California daily overtime rules (>8 hours/day at 1.5x, >12 hours/day at 2.0x) aggregated across multi-shift workdays.
-- Computes blended regular rates of pay for employees working multiple roles at different wage rates in the same pay period.
-
-### 5. NetSuite Double-Entry GL Journal (`src/integrations/netsuite.ts`)
-- Generates balanced daily general ledger journals ($\sum \text{Debits} \equiv \sum \text{Credits}$) across Cash on Hand (1010), Merchant Card Clearing (1020), 3rd-Party Delivery AR (1030), Tip Liability (2020), Sales Tax Payable (2010), and Food Revenue (4010).
-
-### 6. Unit of Measure (UOM) Conversions (`src/inventory/uom-conversion.ts`)
-- Cascades conversions from purchasing packaging (e.g. 50lb bag) to storage inventory (pounds/kilograms) to recipe depletion (grams/ounces).
-- Computes dynamic morning prep par levels from sales forecasts and historical item velocity.
+- **Table Floor Plan Engine (`src/pos/table-floor-plan.ts`)**: Manages 10-table visual floor grid with seating party, course staging (`HELD` &rarr; `FIRED`), table transfers, and payment settlement.
+- **Purchase Orders & GRN Receiving (`src/inventory/purchase-order-engine.ts`)**: PO lifecycle (`DRAFT` &rarr; `SENT` &rarr; `RECEIVED`), Goods Receipt Notes (GRN) with automatic short-delivery detection, live stock balance increments, and blind physical stock-take variance calculations.
+- **Cash Management (`src/pos/cash-management.ts`)**: Starting bank float, mid-shift safe drops, petty cash pay-outs, and blind End-of-Day (EOD) Z-reports.
+- **Order Lifecycle (`src/pos/order-lifecycle.ts`)**: Audited separation of voids (restoring stock) vs comps (depleting stock to spoilage with manager token approval).
+- **Unit-of-Measure Engine (`src/inventory/uom-conversion.ts`)**: Multi-tier conversion from purchasing units down to gram-level recipe depletions with morning prep par levels.
+- **Hardware Integration (`src/hardware/escpos-printer.ts`)**: ESC/POS thermal printing with `DLE EOT` status polling and automatic fallback to backup expo printers.
 
 ---
 
-## Test Coverage
+## Test Suite & Load Verification
 
-The test suite contains 26 tests across 13 domain-organized test files:
+The repository contains 15 domain-specific test suites, a 50-concurrent-order load harness, and an offline WAN chaos simulator:
 
 ```bash
+# Run domain test suites (15 test files, 38 tests passing)
 npm test
+
+# Run 50-concurrent-order load simulation (p50/p95/p99 latency)
+npm run test:load
+
+# Run offline WAN chaos simulation (offline queueing + cloud flush)
+npm run test:chaos
 ```
 
 ```text
- ✓ tests/netsuite-gl.test.ts        (1 test passed)
- ✓ tests/inventory-recipe.test.ts   (2 tests passed)
- ✓ tests/tip-pooling.test.ts        (2 tests passed)
- ✓ tests/sync-engine.test.ts        (2 tests passed)
- ✓ tests/adp-payroll.test.ts        (2 tests passed)
- ✓ tests/escpos-printer.test.ts     (3 tests passed)
- ✓ tests/tenant-isolation.test.ts   (3 tests passed)
- ✓ tests/royalty.test.ts            (1 test passed)
- ✓ tests/labor-compliance.test.ts   (2 tests passed)
- ✓ tests/order-lifecycle.test.ts    (2 tests passed)
- ✓ tests/tax-engine.test.ts         (3 tests passed)
- ✓ tests/uom-conversion.test.ts     (2 tests passed)
- ✓ tests/cash-management.test.ts    (1 test passed)
-
- Test Files  13 passed (13)
-      Tests  26 passed (26)
+ Test Files  15 passed (15)
+      Tests  38 passed (38)
 ```
 
 ---
@@ -151,6 +139,10 @@ npm run dev:ui
 
 # Run test suite
 npm test
+
+# Run load & chaos simulations
+npm run test:load
+npm run test:chaos
 ```
 
 ### Docker Deployment
