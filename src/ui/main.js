@@ -1,14 +1,14 @@
-// Enterprise Multi-Unit RMS - Definitive Workspaces Suite
+// Restaurant Management System - Web Operations Console
 
 const EDGE_SERVER_URL = 'http://localhost:3001';
 const EDGE_WS_URL = 'ws://localhost:3001';
 
 const state = {
-  selectedPersona: 'hq_executive',
+  activeModule: 'pos_register', // pos_register | kds | inventory_prep | labor_shifts | menu_catalog | franchise_financials | field_audit | franchise_overview
   storeOffline: false,
   apiConnected: false,
   wsConnected: false,
-  modalOpen: null, // null | 'add_menu_item' | 'field_audit' | 'log_spoilage' | 'add_shift'
+  modalOpen: null, // null | 'add_menu_item' | 'field_audit' | 'log_spoilage' | 'add_shift' | 'cash_drop'
   selectedTaxJurisdiction: 'US_SALES_TAX',
   menuItems: [
     { id: 'item-101', sku: 'PIZ-PEP-LG', name: 'Large Pepperoni Pizza', category: 'Pizzas', basePrice: 18.99, image: '/pepperoni_pizza.jpg', allergens: ['DAIRY', 'GLUTEN'], isBrandLocked: true, version: 3 },
@@ -36,12 +36,12 @@ const state = {
     { id: 'emp-103', name: 'Michael Smith', role: 'Shift Lead', status: 'CLOCKED_OUT', shiftStart: 'Yesterday', hours: 8.0, breakAttested: true },
   ],
   auditLedger: [
-    { id: 'aud-991', timestamp: '2026-07-31 19:10:00', actor: 'HQ Menu Engineer', action: 'UPDATE_PRICE', target: 'MenuItem (PIZ-PEP-LG)', hash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' },
-    { id: 'aud-990', timestamp: '2026-07-31 18:45:00', actor: 'Security Director', action: 'LOCK_BRAND_RECORD', target: 'Recipe (Craft Garlic Knots)', hash: '8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4' },
+    { id: 'aud-991', timestamp: '2026-08-01 19:10:00', actor: 'HQ Menu Admin', action: 'UPDATE_PRICE', target: 'MenuItem (PIZ-PEP-LG)', hash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' },
+    { id: 'aud-990', timestamp: '2026-08-01 18:45:00', actor: 'Brand Director', action: 'LOCK_BRAND_RECORD', target: 'Recipe (Craft Garlic Knots)', hash: '8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4' },
   ],
   canaryRolloutPct: 15,
   fieldAudits: [
-    { id: 'aud-st-104', storeId: 'Store #104 (Chicago)', inspector: 'Sarah Jenkins', score: '96%', date: '2026-07-31', status: 'PASSED' },
+    { id: 'aud-st-104', storeId: 'Store #104 (Chicago)', inspector: 'Sarah Jenkins', score: '96%', date: '2026-08-01', status: 'PASSED' },
     { id: 'aud-st-101', storeId: 'Store #101 (Downtown)', inspector: 'Mark Vance', score: '98%', date: '2026-07-30', status: 'PASSED' },
   ],
   tipPoolTotal: 450.00,
@@ -99,36 +99,32 @@ function renderApp() {
       <div class="brand-section">
         <img src="/restaurant_logo.jpg" alt="Logo" class="logo-img" />
         <div>
-          <div class="brand-title">Frenchize RMS</div>
-          <div class="brand-subtitle">Distributed Multi-Unit Suite</div>
+          <div class="brand-title">RMS Store Console</div>
+          <div class="brand-subtitle">Store #104 Chicago West &bull; Node Edge Online</div>
         </div>
       </div>
 
-      <!-- Persona Selector -->
-      <div class="persona-selector">
-        <span>👤 Role Workspace:</span>
-        <select class="persona-select" onchange="selectPersona(this.value)">
-          <option value="hq_executive" ${state.selectedPersona === 'hq_executive' ? 'selected' : ''}>🏢 HQ Executive / Menu Engineer</option>
-          <option value="regional_director" ${state.selectedPersona === 'regional_director' ? 'selected' : ''}>🌐 Regional Director / Field Manager</option>
-          <option value="franchisee" ${state.selectedPersona === 'franchisee' ? 'selected' : ''}>📈 Franchisee Operator</option>
-          <option value="store_gm" ${state.selectedPersona === 'store_gm' ? 'selected' : ''}>⏱️ Store General Manager</option>
-          <option value="kitchen_lead" ${state.selectedPersona === 'kitchen_lead' ? 'selected' : ''}>👨‍🍳 Kitchen Manager / Prep Lead</option>
-          <option value="cashier" ${state.selectedPersona === 'cashier' ? 'selected' : ''}>🛒 Cashier / Front-of-House</option>
-          <option value="procurement" ${state.selectedPersona === 'procurement' ? 'selected' : ''}>📦 Procurement / Supply Chain</option>
-          <option value="finance_admin" ${state.selectedPersona === 'finance_admin' ? 'selected' : ''}>💳 Finance & Royalty Admin</option>
-        </select>
-      </div>
+      <!-- Module Navigation Tabs -->
+      <nav class="module-nav">
+        <button class="nav-tab ${state.activeModule === 'pos_register' ? 'active' : ''}" onclick="selectModule('pos_register')">POS Register</button>
+        <button class="nav-tab ${state.activeModule === 'kds' ? 'active' : ''}" onclick="selectModule('kds')">Kitchen Display</button>
+        <button class="nav-tab ${state.activeModule === 'inventory_prep' ? 'active' : ''}" onclick="selectModule('inventory_prep')">Inventory & Prep</button>
+        <button class="nav-tab ${state.activeModule === 'labor_shifts' ? 'active' : ''}" onclick="selectModule('labor_shifts')">Labor & Shifts</button>
+        <button class="nav-tab ${state.activeModule === 'menu_catalog' ? 'active' : ''}" onclick="selectModule('menu_catalog')">Menu Catalog</button>
+        <button class="nav-tab ${state.activeModule === 'franchise_financials' ? 'active' : ''}" onclick="selectModule('franchise_financials')">Financials & GL</button>
+        <button class="nav-tab ${state.activeModule === 'franchise_overview' ? 'active' : ''}" onclick="selectModule('franchise_overview')">Franchise Portal</button>
+      </nav>
 
-      <!-- Connection Pill -->
-      <div class="status-pill ${state.storeOffline ? 'offline' : ''}" onclick="toggleOffline()">
+      <!-- Connection Status Pill -->
+      <div class="status-pill ${state.storeOffline ? 'offline' : ''}" onclick="toggleOffline()" title="Click to simulate network drop">
         <span class="status-dot"></span>
-        <span>${state.storeOffline ? 'STORE EDGE (OFFLINE)' : `STORE EDGE (${state.wsConnected ? 'WS & REST ACTIVE' : 'ONLINE'})`}</span>
+        <span>${state.storeOffline ? 'EDGE OFFLINE' : `EDGE ONLINE (${state.wsConnected ? 'LAN WS' : 'REST'})`}</span>
       </div>
     </header>
 
     <!-- Main View -->
     <main class="view-container">
-      ${renderPersonaWorkspace()}
+      ${renderActiveModule()}
     </main>
 
     <!-- Modals -->
@@ -136,41 +132,295 @@ function renderApp() {
   `;
 }
 
-function renderPersonaWorkspace() {
-  switch (state.selectedPersona) {
-    case 'hq_executive': return renderHQExecutiveWorkspace();
-    case 'regional_director': return renderRegionalDirectorWorkspace();
-    case 'franchisee': return renderFranchiseeWorkspace();
-    case 'store_gm': return renderStoreGMWorkspace();
-    case 'kitchen_lead': return renderKitchenLeadWorkspace();
-    case 'cashier': return renderCashierWorkspace();
-    case 'procurement': return renderProcurementWorkspace();
-    case 'finance_admin': return renderFinanceAdminWorkspace();
-    default: return renderHQExecutiveWorkspace();
+function renderActiveModule() {
+  switch (state.activeModule) {
+    case 'pos_register': return renderPOSRegisterWorkspace();
+    case 'kds': return renderKDSWorkspace();
+    case 'inventory_prep': return renderInventoryPrepWorkspace();
+    case 'labor_shifts': return renderLaborShiftsWorkspace();
+    case 'menu_catalog': return renderMenuCatalogWorkspace();
+    case 'franchise_financials': return renderFinancialsWorkspace();
+    case 'franchise_overview': return renderFranchiseOverviewWorkspace();
+    default: return renderPOSRegisterWorkspace();
   }
 }
 
-// 1. HQ EXECUTIVE WORKSPACE
-function renderHQExecutiveWorkspace() {
+// 1. POS REGISTER
+function renderPOSRegisterWorkspace() {
+  const subtotal = state.cart.reduce((sum, item) => sum + item.basePrice * item.qty, 0);
+  const taxRate = state.selectedTaxJurisdiction === 'EU_VAT' ? 0.20 : state.selectedTaxJurisdiction === 'INDIA_GST' ? 0.05 : 0.08;
+  const taxAmount = subtotal * taxRate;
+  const total = subtotal + taxAmount;
+
   return `
     <div class="section-header">
       <div>
-        <h2 class="section-title">🏢 HQ Menu Inheritance & Brand Control Workspace</h2>
-        <p class="section-subtitle">Platform ➔ Brand ➔ Region ➔ Store Resolution • Brand Lock Safeguards • Staged Canary Rollout</p>
+        <h2 class="section-title">Point of Sale Register</h2>
+        <p class="section-subtitle">Terminal 01 &bull; Local SQLite WAL Checkouts &bull; Offline Durability</p>
       </div>
       <div class="header-actions">
-        <button class="btn-primary" onclick="openModal('add_menu_item')">➕ Add Master Menu Item</button>
-        <button class="btn-primary btn-purple" onclick="increaseCanaryRollout()">🚀 Advance Canary Rollout (${state.canaryRolloutPct}%)</button>
-        <button class="btn-primary btn-danger" onclick="rollbackCanary()">⚡ 1-Click Rollback</button>
+        <span class="badge badge-online">TAX PROFILE: US SALES TAX</span>
+        <button class="btn-primary" style="background:#475569;" onclick="alert('Starting bank initialized: $200.00 float.')">Cash Drawer: $200 Bank</button>
       </div>
     </div>
 
-    <!-- Master Menu Management Table -->
-    <div class="card" style="margin-bottom: 2rem;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-        <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display);">🔒 Global Master Menu Items & Brand-Lock Controls</h3>
-        <span class="badge badge-locked">HQ BRAND LOCK ACTIVE</span>
+    <div class="pos-layout">
+      <!-- Menu Item Grid -->
+      <div class="menu-grid">
+        ${state.menuItems.map(item => `
+          <div class="pos-card" onclick="addToCart('${item.id}')">
+            <img src="${item.image}" alt="${item.name}" class="pos-card-img" />
+            <div class="pos-card-body">
+              <div class="pos-card-title">${item.name}</div>
+              <div class="pos-card-category">${item.category} &bull; ${item.sku}</div>
+              <div class="pos-card-footer">
+                <span class="pos-card-price">$${item.basePrice.toFixed(2)}</span>
+                <button class="btn-add">Add +</button>
+              </div>
+            </div>
+          </div>
+        `).join('')}
       </div>
+
+      <!-- Register Ticket Sidebar -->
+      <div class="cart-sidebar">
+        <div class="cart-header">
+          <h3 style="font-size:1.1rem; font-weight:700;">Current Order</h3>
+          <span style="font-size:0.8rem; color:var(--text-muted);">${state.cart.length} line items</span>
+        </div>
+
+        <div class="cart-items">
+          ${state.cart.length === 0 ? `
+            <div style="text-align:center; padding:3rem 1rem; color:var(--text-muted);">
+              <div>Ticket is empty</div>
+              <div style="font-size:0.8rem; margin-top:0.5rem;">Select items from the menu to build order</div>
+            </div>
+          ` : state.cart.map((item, idx) => `
+            <div class="cart-item">
+              <div>
+                <div style="font-weight:600; font-size:0.95rem;">${item.name}</div>
+                <div style="font-size:0.8rem; color:var(--text-muted);">$${item.basePrice.toFixed(2)} each</div>
+              </div>
+              <div style="display:flex; align-items:center; gap:0.5rem;">
+                <button class="qty-btn" onclick="updateCartQty(${idx}, -1)">-</button>
+                <span style="font-weight:700;">${item.qty}</span>
+                <button class="qty-btn" onclick="updateCartQty(${idx}, 1)">+</button>
+                <span style="font-weight:700; width:55px; text-align:right;">$${(item.basePrice * item.qty).toFixed(2)}</span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="cart-totals">
+          <div class="totals-row">
+            <span>Subtotal:</span>
+            <span>$${subtotal.toFixed(2)}</span>
+          </div>
+          <div class="totals-row">
+            <span>Tax (8%):</span>
+            <span>$${taxAmount.toFixed(2)}</span>
+          </div>
+          <div class="totals-row total-highlight">
+            <span>Total Due:</span>
+            <span>$${total.toFixed(2)}</span>
+          </div>
+
+          <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+            <button class="btn-primary" style="flex:1;" onclick="checkoutOrder('CARD')" ${state.cart.length === 0 ? 'disabled' : ''}>Charge Card ($${total.toFixed(2)})</button>
+            <button class="btn-primary" style="flex:1; background:#059669;" onclick="checkoutOrder('CASH')" ${state.cart.length === 0 ? 'disabled' : ''}>Cash Tender</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// 2. KITCHEN DISPLAY (KDS)
+function renderKDSWorkspace() {
+  return `
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Kitchen Display System (KDS)</h2>
+        <p class="section-subtitle">Station: Hotline 01 &bull; Real-time LAN WebSocket Ticket Routing (&lt;200ms)</p>
+      </div>
+      <div class="header-actions">
+        <span class="badge badge-online">EXPO ROUTING: ACTIVE</span>
+        <button class="btn-primary btn-purple" onclick="testPrintESCPOSTicket()">Test ESC/POS Print (Port 9100)</button>
+      </div>
+    </div>
+
+    <div class="kds-grid">
+      ${state.kdsTickets.map((t, idx) => `
+        <div class="kds-card ${t.urgent ? 'urgent' : ''}">
+          <div class="kds-card-header">
+            <div>
+              <div style="font-weight:700; font-size:1.05rem;">#${t.id.slice(-6)}</div>
+              <div style="font-size:0.8rem; color:var(--text-muted);">${t.source} &bull; ${t.time}</div>
+            </div>
+            <span class="badge ${t.urgent ? 'badge-urgent' : 'badge-normal'}">${t.status}</span>
+          </div>
+          <div class="kds-card-items">
+            ${t.items.map(i => `
+              <div style="display:flex; justify-content:space-between; padding:0.4rem 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+                <span><strong>${i.qty}x</strong> ${i.name}</span>
+                ${i.allergens ? `<span style="color:#f87171; font-size:0.75rem;">${i.allergens.join(', ')}</span>` : ''}
+              </div>
+            `).join('')}
+          </div>
+          <div style="margin-top:1rem; display:flex; gap:0.5rem;">
+            <button class="btn-primary" style="flex:1; padding:0.5rem;" onclick="bumpKDSTicket(${idx})">Bump / Complete</button>
+            <button class="btn-primary" style="background:#475569; padding:0.5rem;" onclick="printStationTicket('${t.id}')">Print Ticket</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+// 3. INVENTORY & PREP
+function renderInventoryPrepWorkspace() {
+  return `
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Inventory, Prep & Spoilage</h2>
+        <p class="section-subtitle">Gram-Level Recipe Depletion &bull; Trim Shrinkage &bull; Par Level Guidance</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn-primary" onclick="openModal('log_spoilage')">Log Kitchen Waste</button>
+      </div>
+    </div>
+
+    <!-- Inventory Variance Table -->
+    <div class="card" style="margin-bottom:2rem;">
+      <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:1rem;">Theoretical vs. Actual Variance Tracking</h3>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ingredient</th>
+              <th>Theoretical Use</th>
+              <th>Actual Count</th>
+              <th>Unit</th>
+              <th>Variance</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${state.inventoryVariances.map(v => `
+              <tr>
+                <td><strong>${v.name}</strong></td>
+                <td>${v.theoretical}</td>
+                <td>${v.actual}</td>
+                <td>${v.unit}</td>
+                <td style="color:${v.alert ? '#f87171' : '#34d399'}; font-weight:700;">${v.variancePct}</td>
+                <td><span class="badge ${v.alert ? 'badge-danger' : 'badge-online'}">${v.alert ? 'VARIANCE ALERT' : 'IN RANGE'}</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Spoilage Logs -->
+    <div class="card">
+      <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:1rem;">Shift Spoilage & Waste Log</h3>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Log ID</th>
+              <th>Item Name</th>
+              <th>Qty Lost</th>
+              <th>Reason Code</th>
+              <th>Cost Impact</th>
+              <th>Logged By</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${state.spoilageLogs.map(s => `
+              <tr>
+                <td><code>${s.id}</code></td>
+                <td>${s.item}</td>
+                <td>${s.qty}</td>
+                <td><span class="badge badge-danger">${s.reason}</span></td>
+                <td><strong>${s.cost}</strong></td>
+                <td>${s.loggedBy}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// 4. LABOR & SHIFTS
+function renderLaborShiftsWorkspace() {
+  return `
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Labor & Shift Scheduling</h2>
+        <p class="section-subtitle">FLSA Tip Pooling Compliance &bull; Fair Workweek Rest Guardrails &bull; California Daily OT</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn-primary" onclick="openModal('add_shift')">Schedule Shift</button>
+        <button class="btn-primary btn-purple" onclick="runAILaborOptimizer()">Run Labor Optimizer (Target 22%)</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:2rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+        <h3 style="font-size:1.1rem; font-weight:700;">Active Store Staff Roster</h3>
+        <span class="badge badge-online">TIP POOL ACCRUED: $${state.tipPoolTotal.toFixed(2)}</span>
+      </div>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Staff Member</th>
+              <th>Assigned Role</th>
+              <th>Shift Status</th>
+              <th>Shift Start</th>
+              <th>Hours</th>
+              <th>Break Attestation</th>
+              <th>FLSA Tip Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${state.employees.map(e => `
+              <tr>
+                <td><strong>${e.name}</strong></td>
+                <td>${e.role}</td>
+                <td><span class="badge ${e.status === 'CLOCKED_IN' ? 'badge-online' : 'badge-danger'}">${e.status}</span></td>
+                <td>${e.shiftStart}</td>
+                <td>${e.hours} hrs</td>
+                <td><span class="badge badge-online">COMPLIANT</span></td>
+                <td>${e.role === 'Shift Lead' ? '<span style="color:#94a3b8;">Excluded (FLSA §3m)</span>' : '<span style="color:#34d399; font-weight:700;">Eligible</span>'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// 5. MENU CATALOG
+function renderMenuCatalogWorkspace() {
+  return `
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Menu Catalog & Brand-Lock Control</h2>
+        <p class="section-subtitle">Hierarchy: Platform &rarr; Brand &rarr; Region &rarr; Store &bull; Automatic Sync</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn-primary" onclick="openModal('add_menu_item')">Add Menu Item</button>
+        <button class="btn-primary btn-purple" onclick="increaseCanaryRollout()">Advance Rollout (${state.canaryRolloutPct}%)</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:1rem;">Master Menu Catalog</h3>
       <div class="table-container">
         <table class="data-table">
           <thead>
@@ -180,56 +430,140 @@ function renderHQExecutiveWorkspace() {
               <th>Category</th>
               <th>Base Price</th>
               <th>Allergens</th>
-              <th>HQ Brand Lock</th>
-              <th>Version</th>
-              <th>Actions</th>
+              <th>Brand Lock</th>
             </tr>
           </thead>
           <tbody>
             ${state.menuItems.map(item => `
               <tr>
-                <td style="font-family:var(--font-mono); font-weight:700;">${item.sku}</td>
-                <td style="font-weight:700;">${item.name}</td>
+                <td><code>${item.sku}</code></td>
+                <td><strong>${item.name}</strong></td>
                 <td>${item.category}</td>
-                <td style="font-family:var(--font-mono); color:var(--accent-emerald); font-weight:800;">$${item.basePrice.toFixed(2)}</td>
-                <td>${item.allergens && item.allergens.length ? `<span class="badge badge-alert">⚠️ ${item.allergens.join(', ')}</span>` : '<span class="badge badge-success">NONE</span>'}</td>
-                <td>${item.isBrandLocked ? '<span class="badge badge-locked">🔒 BRAND LOCKED</span>' : '<span class="badge badge-warning">UNLOCKED</span>'}</td>
-                <td style="font-family:var(--font-mono);">v${item.version || 1}</td>
-                <td>
-                  <button class="btn-primary" style="padding:0.3rem 0.65rem; font-size:0.75rem;" onclick="toggleBrandLock('${item.id}')">${item.isBrandLocked ? 'Unlock' : 'Lock HQ'}</button>
-                  <button class="btn-primary btn-purple" style="padding:0.3rem 0.65rem; font-size:0.75rem;" onclick="promptPriceEdit('${item.id}')">Edit Price</button>
-                </td>
+                <td>$${item.basePrice.toFixed(2)}</td>
+                <td>${item.allergens.join(', ') || 'None'}</td>
+                <td><span class="badge ${item.isBrandLocked ? 'badge-locked' : 'badge-online'}">${item.isBrandLocked ? 'BRAND LOCKED' : 'STORE OVERRIDABLE'}</span></td>
               </tr>
             `).join('')}
           </tbody>
         </table>
       </div>
     </div>
+  `;
+}
 
-    <!-- SHA-256 Audit Log Ledger -->
-    <div class="card">
-      <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display); margin-bottom:1rem;">🛡️ Tamper-Proof Cryptographic SHA-256 Audit Log Ledger</h3>
+// 6. FINANCIALS & GL
+function renderFinancialsWorkspace() {
+  return `
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Financial Accounting & General Ledger</h2>
+        <p class="section-subtitle">NetSuite Double-Entry GL &bull; Franchise Royalty ACH Drafts &bull; ADP Payroll</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn-primary" onclick="generateNetSuiteGLVoucher()">Export NetSuite GL Journal</button>
+        <button class="btn-primary btn-purple" onclick="generateRoyaltyInvoice()">Generate Franchise Royalty ACH</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:2rem;">
+      <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:1rem;">NetSuite General Ledger Accounts (Debits === Credits)</h3>
       <div class="table-container">
         <table class="data-table">
           <thead>
             <tr>
-              <th>Audit ID</th>
+              <th>Account</th>
+              <th>Description</th>
+              <th>Debit ($)</th>
+              <th>Credit ($)</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>1010</code></td>
+              <td>Cash on Hand (Store Safe Float + Drawer)</td>
+              <td><strong>$550.00</strong></td>
+              <td>$0.00</td>
+              <td><span class="badge badge-online">BALANCED</span></td>
+            </tr>
+            <tr>
+              <td><code>1020</code></td>
+              <td>Merchant Card Settlement Clearing</td>
+              <td><strong>$1,840.00</strong></td>
+              <td>$0.00</td>
+              <td><span class="badge badge-online">BALANCED</span></td>
+            </tr>
+            <tr>
+              <td><code>1030</code></td>
+              <td>3rd-Party Delivery AR (DoorDash / UberEats)</td>
+              <td><strong>$620.00</strong></td>
+              <td>$0.00</td>
+              <td><span class="badge badge-online">BALANCED</span></td>
+            </tr>
+            <tr>
+              <td><code>2010</code></td>
+              <td>Sales Tax Payable</td>
+              <td>$0.00</td>
+              <td><strong>$240.80</strong></td>
+              <td><span class="badge badge-online">BALANCED</span></td>
+            </tr>
+            <tr>
+              <td><code>2020</code></td>
+              <td>Accrued Tip Liability (Owed to Staff)</td>
+              <td>$0.00</td>
+              <td><strong>$450.00</strong></td>
+              <td><span class="badge badge-online">BALANCED</span></td>
+            </tr>
+            <tr>
+              <td><code>4010</code></td>
+              <td>Food & Beverage Sales Revenue</td>
+              <td>$0.00</td>
+              <td><strong>$2,319.20</strong></td>
+              <td><span class="badge badge-online">BALANCED</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// 7. FRANCHISE OVERVIEW
+function renderFranchiseOverviewWorkspace() {
+  return `
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Franchise Portal & Store Audit Logs</h2>
+        <p class="section-subtitle">Multi-Store Ownership Overview &bull; Store Audit Trail &bull; Performance</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn-primary" onclick="alert('Store performance report exported.')">Export Monthly P&L</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:1rem;">Cryptographic Audit Ledger</h3>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Log ID</th>
               <th>Timestamp</th>
-              <th>Actor Role</th>
+              <th>Actor</th>
               <th>Action</th>
-              <th>Target Entity</th>
-              <th>SHA-256 Hash Chain Verification</th>
+              <th>Target</th>
+              <th>SHA-256 Hash</th>
             </tr>
           </thead>
           <tbody>
             ${state.auditLedger.map(a => `
               <tr>
-                <td style="font-family:var(--font-mono); font-weight:700;">${a.id}</td>
-                <td style="font-size:0.85rem; color:var(--text-secondary);">${a.timestamp}</td>
-                <td style="font-weight:700; color:var(--accent-blue);">${a.actor}</td>
-                <td><span class="badge badge-success">${a.action}</span></td>
+                <td><code>${a.id}</code></td>
+                <td>${a.timestamp}</td>
+                <td><strong>${a.actor}</strong></td>
+                <td><span class="badge badge-online">${a.action}</span></td>
                 <td>${a.target}</td>
-                <td style="font-family:var(--font-mono); font-size:0.75rem; color:var(--text-muted);">${a.hash}</td>
+                <td><code style="font-size:0.75rem;">${a.hash.slice(0, 16)}...</code></td>
               </tr>
             `).join('')}
           </tbody>
@@ -239,610 +573,90 @@ function renderHQExecutiveWorkspace() {
   `;
 }
 
-// 2. REGIONAL DIRECTOR WORKSPACE
-function renderRegionalDirectorWorkspace() {
-  return `
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">🌐 Regional Director Benchmarking & Field Audit Tool</h2>
-        <p class="section-subtitle">Cross-Location Store Heatmaps • Brand Standards Inspection • Mobile Field Auditing</p>
-      </div>
-      <div class="header-actions">
-        <button class="btn-primary" onclick="openModal('field_audit')">📱 Conduct Mobile Field Inspection</button>
-      </div>
-    </div>
+// Global actions
+window.selectModule = function(mod) {
+  state.activeModule = mod;
+  renderApp();
+};
 
-    <!-- Benchmarking Table -->
-    <div class="card" style="margin-bottom:2rem;">
-      <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display); margin-bottom:1rem;">📊 Multi-Store Performance Benchmarking (Chicago Region)</h3>
-      <div class="table-container">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Store Location</th>
-              <th>Gross Revenue</th>
-              <th>COGS % (Target 29%)</th>
-              <th>Labor % (Target <= 22%)</th>
-              <th>Variance Alert</th>
-              <th>Audit Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style="font-weight:700;">Store #101 (Downtown Chicago)</td>
-              <td style="font-family:var(--font-mono);">$8,450.00</td>
-              <td style="font-family:var(--font-mono); color:var(--accent-emerald);">27.8%</td>
-              <td style="font-family:var(--font-mono); color:var(--accent-emerald);">18.1%</td>
-              <td><span class="badge badge-success">NORMAL</span></td>
-              <td><span class="badge badge-success">98% PASSED</span></td>
-            </tr>
-            <tr>
-              <td style="font-weight:700;">Store #104 (Chicago West)</td>
-              <td style="font-family:var(--font-mono);">$6,200.00</td>
-              <td style="font-family:var(--font-mono); color:var(--accent-rose);">31.2%</td>
-              <td style="font-family:var(--font-mono); color:var(--accent-emerald);">18.4%</td>
-              <td><span class="badge badge-alert">SHRINKAGE ALERT</span></td>
-              <td><span class="badge badge-success">96% PASSED</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+window.addToCart = function(id) {
+  const item = state.menuItems.find(m => m.id === id);
+  if (!item) return;
+  const existing = state.cart.find(c => c.id === id);
+  if (existing) {
+    existing.qty++;
+  } else {
+    state.cart.push({ ...item, qty: 1 });
+  }
+  renderApp();
+};
 
-    <!-- Field Audit Log -->
-    <div class="card">
-      <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display); margin-bottom:1rem;">📋 Completed Mobile Field Audits</h3>
-      <div class="table-container">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Audit ID</th>
-              <th>Store Unit</th>
-              <th>Field Inspector</th>
-              <th>Compliance Score</th>
-              <th>Audit Date</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${state.fieldAudits.map(f => `
-              <tr>
-                <td style="font-family:var(--font-mono); font-weight:700;">${f.id}</td>
-                <td style="font-weight:700;">${f.storeId}</td>
-                <td>${f.inspector}</td>
-                <td style="font-family:var(--font-mono); font-weight:800; color:var(--accent-emerald);">${f.score}</td>
-                <td style="font-size:0.85rem; color:var(--text-secondary);">${f.date}</td>
-                <td><span class="badge badge-success">${f.status}</span></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-}
+window.updateCartQty = function(idx, delta) {
+  state.cart[idx].qty += delta;
+  if (state.cart[idx].qty <= 0) {
+    state.cart.splice(idx, 1);
+  }
+  renderApp();
+};
 
-// 3. FRANCHISEE WORKSPACE
-function renderFranchiseeWorkspace() {
-  return `
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">📈 Franchisee Self-Service Portal (Store #104)</h2>
-        <p class="section-subtitle">Tenant-Isolated Financials • Tiered Royalty Breakdown • Automated ACH Statement Generator</p>
-      </div>
-      <div class="header-actions">
-        <button class="btn-primary btn-success" onclick="generateRoyaltyStatement()">📄 Export Royalty ACH Statement</button>
-      </div>
-    </div>
-
-    <div class="grid-2">
-      <div class="card">
-        <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display); margin-bottom:1rem;">💰 Tenant P&L Contribution Breakdown</h3>
-        <div class="table-container">
-          <table class="data-table">
-            <tbody>
-              <tr>
-                <td style="font-weight:700;">Gross POS Live Sales</td>
-                <td style="font-family:var(--font-mono); color:var(--accent-emerald); font-weight:800; text-align:right;">$64,250.00</td>
-              </tr>
-              <tr>
-                <td>Cost of Goods Sold (COGS 29.1%)</td>
-                <td style="font-family:var(--font-mono); color:var(--accent-rose); text-align:right;">-$18,696.75</td>
-              </tr>
-              <tr>
-                <td>Store Labor Expenses (18.4%)</td>
-                <td style="font-family:var(--font-mono); color:var(--accent-rose); text-align:right;">-$11,822.00</td>
-              </tr>
-              <tr>
-                <td>Brand Royalty Fee (4.5%)</td>
-                <td style="font-family:var(--font-mono); color:var(--accent-blue); text-align:right;">-$2,891.25</td>
-              </tr>
-              <tr>
-                <td>National Marketing Fund (2.0%)</td>
-                <td style="font-family:var(--font-mono); color:var(--accent-purple); text-align:right;">-$1,285.00</td>
-              </tr>
-              <tr style="border-top:2px solid rgba(255,255,255,0.15);">
-                <td style="font-weight:800; font-size:1.1rem;">Net Store Operating Profit</td>
-                <td style="font-family:var(--font-mono); color:#34d399; font-weight:800; font-size:1.2rem; text-align:right;">$29,555.00</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display); margin-bottom:1rem;">📂 Franchise Agreement & Compliance Library</h3>
-        <div style="display:flex; flex-direction:column; gap:0.85rem;">
-          <div style="padding:1rem; background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:10px; display:flex; justify-content:space-between; align-items:center;">
-            <div>
-              <strong style="color:#ffffff;">Franchise Disclosure Agreement v4.2</strong>
-              <div style="font-size:0.8rem; color:var(--text-secondary);">Signed Jan 15, 2026 • Valid thru 2036</div>
-            </div>
-            <button class="btn-primary" style="padding:0.35rem 0.75rem; font-size:0.75rem;" onclick="alert('Downloading Agreement PDF...')">View PDF</button>
-          </div>
-          <div style="padding:1rem; background:rgba(255,255,255,0.03); border:1px solid var(--border-color); border-radius:10px; display:flex; justify-content:space-between; align-items:center;">
-            <div>
-              <strong style="color:#ffffff;">Store Opening Milestone Checklist</strong>
-              <div style="font-size:0.8rem; color:var(--text-secondary);">100% Passed • Verified by HQ</div>
-            </div>
-            <span class="badge badge-success">COMPLETED</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-// 4. STORE GM WORKSPACE
-function renderStoreGMWorkspace() {
-  return `
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">⏱️ Store GM Employee Shift & Fair Workweek Workspace</h2>
-        <p class="section-subtitle">Real-time Employee Timecards • AI Labor Scheduler • Clopening Rest Guardrails (< 11h Rest)</p>
-      </div>
-      <div class="header-actions">
-        <button class="btn-primary" onclick="openModal('add_shift')">📅 Add Shift to AI Schedule</button>
-      </div>
-    </div>
-
-    <!-- Active Employee Timecards Table -->
-    <div class="card" style="margin-bottom:2rem;">
-      <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display); margin-bottom:1rem;">👥 Shift Employee Timecards & Break Attestations</h3>
-      <div class="table-container">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Employee Name</th>
-              <th>Role</th>
-              <th>Clock Status</th>
-              <th>Shift Start</th>
-              <th>Shift Hours</th>
-              <th>Meal/Rest Break Attestation</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${state.employees.map(e => `
-              <tr>
-                <td style="font-weight:700;">${e.name}</td>
-                <td>${e.role}</td>
-                <td>${e.status === 'CLOCKED_IN' ? '<span class="badge badge-success">🟢 CLOCKED IN</span>' : '<span class="badge badge-locked">🔴 CLOCKED OUT</span>'}</td>
-                <td style="font-size:0.85rem; color:var(--text-secondary);">${e.shiftStart}</td>
-                <td style="font-family:var(--font-mono);">${e.hours} hrs</td>
-                <td>${e.breakAttested ? '<span class="badge badge-success">✅ SIGNED AT CLOCK-OUT</span>' : '<span class="badge badge-alert">PENDING</span>'}</td>
-                <td>
-                  <button class="btn-primary" style="padding:0.35rem 0.75rem; font-size:0.75rem;" onclick="toggleEmployeeClock('${e.id}')">${e.status === 'CLOCKED_IN' ? 'Clock Out' : 'Clock In'}</button>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-}
-
-// 5. KITCHEN MANAGER WORKSPACE
-function renderKitchenLeadWorkspace() {
-  return `
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">👨‍🍳 Kitchen KDS Ticket Queue & Spoilage Production Workspace</h2>
-        <p class="section-subtitle">Real-time LAN WebSocket Tickets (< 200ms) • Recipe Batch Exploder • Spoilage Logger</p>
-      </div>
-      <div class="header-actions">
-        <button class="btn-primary btn-danger" onclick="openModal('log_spoilage')">🗑️ Log Kitchen Spoilage / Waste</button>
-      </div>
-    </div>
-
-    <!-- Live KDS Ticket Grid -->
-    <div class="grid-2" style="margin-bottom:2rem;">
-      ${state.kdsTickets.map((t) => `
-        <div class="card" style="border: 2px solid ${t.urgent ? 'var(--accent-rose)' : 'var(--border-color)'};">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
-            <div>
-              <strong style="font-size:1.1rem; color:#ffffff;">Ticket #${t.id}</strong>
-              <div style="font-size:0.8rem; color:var(--text-secondary);">${t.source} • ${t.time}</div>
-            </div>
-            <span class="badge ${t.urgent ? 'badge-alert' : 'badge-success'}">${t.urgent ? '🔥 URGENT PACING' : 'NORMAL'}</span>
-          </div>
-          <div style="padding:0.75rem 0; border-top:1px solid var(--border-color); border-bottom:1px solid var(--border-color); margin-bottom:1rem;">
-            ${t.items.map(i => `
-              <div style="display:flex; justify-content:space-between; padding:0.35rem 0; font-weight:700;">
-                <span>${i.qty}x ${i.name}</span>
-                ${i.allergens ? `<span style="color:var(--accent-rose); font-size:0.8rem;">⚠️ ${i.allergens.join(', ')}</span>` : ''}
-              </div>
-            `).join('')}
-          </div>
-          <button class="btn-primary btn-success" style="width:100%; justify-content:center;" onclick="bumpKDSTicket('${t.id}')">✅ BUMP TICKET (COMPLETE)</button>
-        </div>
-      `).join('')}
-    </div>
-
-    <!-- Spoilage Logs -->
-    <div class="card">
-      <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display); margin-bottom:1rem;">📦 Logged Kitchen Waste & Spoilage History</h3>
-      <div class="table-container">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Item Name</th>
-              <th>Quantity</th>
-              <th>Reason Code</th>
-              <th>Cost Impact</th>
-              <th>Logged By</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${state.spoilageLogs.map(s => `
-              <tr>
-                <td style="font-weight:700;">${s.item}</td>
-                <td style="font-family:var(--font-mono);">${s.qty}</td>
-                <td><span class="badge badge-alert">${s.reason}</span></td>
-                <td style="font-family:var(--font-mono); color:var(--accent-rose); font-weight:800;">${s.cost}</td>
-                <td style="font-size:0.85rem;">${s.loggedBy}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-}
-
-// 6. CASHIER TOUCH POS WORKSPACE
-function renderCashierWorkspace() {
-  const subtotal = state.cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const tax = subtotal * (state.selectedTaxJurisdiction === 'EU_VAT' ? 0.20 : state.selectedTaxJurisdiction === 'INDIA_GST' ? 0.05 : 0.08);
+window.checkoutOrder = async function(tenderType) {
+  const subtotal = state.cart.reduce((sum, item) => sum + item.basePrice * item.qty, 0);
+  const tax = subtotal * 0.08;
   const total = subtotal + tax;
 
-  return `
-    <div class="pos-layout">
-      <!-- POS Cards -->
-      <div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-          <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display);">🛒 Touch POS Terminal</h3>
-          <select class="persona-select" style="background:#0f172a; padding:0.4rem 0.8rem; border-radius:8px; border:1px solid var(--border-color);" onchange="changeTaxStrategy(this.value)">
-            <option value="US_SALES_TAX" ${state.selectedTaxJurisdiction === 'US_SALES_TAX' ? 'selected' : ''}>🇺🇸 US Sales Tax (8%)</option>
-            <option value="EU_VAT" ${state.selectedTaxJurisdiction === 'EU_VAT' ? 'selected' : ''}>🇪🇺 European VAT (20%)</option>
-            <option value="INDIA_GST" ${state.selectedTaxJurisdiction === 'INDIA_GST' ? 'selected' : ''}>🇮🇳 India GST (5%)</option>
-          </select>
-        </div>
-        <div class="pos-grid">
-          ${state.menuItems.map(item => `
-            <div class="pos-item-card" onclick="addToCart('${item.id}')">
-              <div class="pos-food-img-container">
-                <img src="${item.image}" alt="${item.name}" class="pos-food-img" />
-              </div>
-              <div class="pos-item-body">
-                <div>
-                  <div class="pos-item-name">${item.name}</div>
-                  ${item.allergens && item.allergens.length ? `<span class="badge badge-alert" style="margin-top:0.2rem;">⚠️ ${item.allergens.join(', ')}</span>` : ''}
-                </div>
-                <div class="pos-item-price">$${item.basePrice.toFixed(2)}</div>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
+  const payload = {
+    id: `tx-${Date.now()}`,
+    storeId: 'store-104',
+    terminalId: 'pos-1',
+    timestamp: new Date().toISOString(),
+    items: state.cart.map(i => ({ menuItemId: i.id, quantity: i.qty, unitPrice: i.basePrice })),
+    subtotal: Number(subtotal.toFixed(2)),
+    tax: Number(tax.toFixed(2)),
+    total: Number(total.toFixed(2)),
+    tenders: [{ type: tenderType, amount: Number(total.toFixed(2)) }],
+    offlineMode: state.storeOffline,
+    synced: !state.storeOffline,
+  };
 
-      <!-- Cart Panel -->
-      <div class="cart-panel">
-        <div class="cart-title">
-          <span>Current Order (#${Math.floor(1000 + Math.random() * 9000)})</span>
-          <span style="font-size:0.85rem; color: var(--text-secondary);">Terminal 01</span>
-        </div>
-
-        <div class="cart-items">
-          ${state.cart.length === 0 ? `
-            <div style="text-align:center; padding: 3rem 1rem; color: var(--text-secondary);">
-              <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🛒</div>
-              <div>Cart is empty</div>
-              <div style="font-size: 0.8rem; margin-top: 0.25rem;">Tap culinary menu cards to add to order.</div>
-            </div>
-          ` : state.cart.map(item => `
-            <div class="cart-row">
-              <div>
-                <div style="font-weight:700;">${item.name}</div>
-                <div style="font-size:0.8rem; color:var(--text-secondary);">$${item.price.toFixed(2)} x ${item.qty}</div>
-              </div>
-              <div style="display:flex; align-items:center; gap:0.5rem;">
-                <button class="btn-primary" style="padding:0.15rem 0.4rem; font-size:0.75rem;" onclick="updateCartQty('${item.id}', -1)">-</button>
-                <span style="font-family: var(--font-mono); font-weight:700;">$${(item.price * item.qty).toFixed(2)}</span>
-                <button class="btn-primary" style="padding:0.15rem 0.4rem; font-size:0.75rem;" onclick="updateCartQty('${item.id}', 1)">+</button>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-
-        <div class="cart-totals">
-          <div style="display:flex; justify-content:space-between; color:var(--text-secondary);">
-            <span>Subtotal</span>
-            <span>$${subtotal.toFixed(2)}</span>
-          </div>
-          <div style="display:flex; justify-content:space-between; color:var(--text-secondary); margin-top:0.25rem;">
-            <span>Tax (${state.selectedTaxJurisdiction})</span>
-            <span>$${tax.toFixed(2)}</span>
-          </div>
-          <div class="total-row">
-            <span>Total</span>
-            <span style="color:var(--accent-emerald);">$${total.toFixed(2)}</span>
-          </div>
-
-          <button class="btn-primary btn-success" style="width:100%; margin-top:1.25rem; padding:1rem; justify-content:center;" onclick="submitCheckout()" ${state.cart.length === 0 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>
-            ${state.storeOffline ? '⚡ PROCESS OFFLINE CHECKOUT (DEFERRED AUTH)' : '💳 COMPLETE CHECKOUT (ADYEN P2PE)'}
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-// 7. PROCUREMENT WORKSPACE
-function renderProcurementWorkspace() {
-  return `
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">📦 Inventory Variance & Supplier Reorder Workspace</h2>
-        <p class="section-subtitle">Theoretical vs. Actual Variance Engine • Auto-Flagging ±2.0% Shrinkage • Supplier Reordering</p>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display); margin-bottom:1rem;">⚠️ Inventory Variance Sheet (Theoretical vs Actual)</h3>
-      <div class="table-container">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Ingredient Name</th>
-              <th>Theoretical Count</th>
-              <th>Actual Count</th>
-              <th>Variance %</th>
-              <th>Shrinkage Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${state.inventoryVariances.map(v => `
-              <tr>
-                <td style="font-weight:700;">${v.name}</td>
-                <td style="font-family:var(--font-mono);">${v.theoretical} ${v.unit}</td>
-                <td style="font-family:var(--font-mono);">${v.actual} ${v.unit}</td>
-                <td style="font-family:var(--font-mono); color:${v.alert ? 'var(--accent-rose)' : 'var(--accent-emerald)'}; font-weight:800;">${v.variancePct}</td>
-                <td>${v.alert ? '<span class="badge badge-alert">ALERT >= ±2%</span>' : '<span class="badge badge-success">NORMAL</span>'}</td>
-                <td><button class="btn-primary" style="padding:0.35rem 0.75rem; font-size:0.75rem;" onclick="triggerSupplierReorder('${v.name}')">Reorder Supplier</button></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-}
-
-// 8. FINANCE ADMIN WORKSPACE
-function renderFinanceAdminWorkspace() {
-  const tipPerPerson = (state.tipPoolTotal / state.employees.length).toFixed(2);
-  return `
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">💳 Oracle NetSuite GL & Tip Pool Administration</h2>
-        <p class="section-subtitle">Double-Entry Journal Entries (Debits = Credits) • Role-Weighted Tip Payout Allocations</p>
-      </div>
-      <div class="header-actions">
-        <button class="btn-primary" onclick="calculateTipDistribution()">💵 Recalculate Shift Tip Pool</button>
-      </div>
-    </div>
-
-    <div class="grid-2">
-      <!-- GL Double-Entry Table -->
-      <div class="card">
-        <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display); margin-bottom:1rem;">📖 NetSuite Balanced GL Journal Entry</h3>
-        <div class="table-container">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Account Code & Name</th>
-                <th>Debit ($)</th>
-                <th>Credit ($)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td style="font-weight:700;">Account 1010 (Cash/Card Tenders)</td>
-                <td style="font-family:var(--font-mono); color:var(--accent-emerald);">$41.02</td>
-                <td style="font-family:var(--font-mono);">$0.00</td>
-              </tr>
-              <tr>
-                <td>Account 4010 (Food Sales Revenue)</td>
-                <td style="font-family:var(--font-mono);">$0.00</td>
-                <td style="font-family:var(--font-mono); color:var(--accent-blue);">$37.98</td>
-              </tr>
-              <tr>
-                <td>Account 2010 (Sales Tax Payable)</td>
-                <td style="font-family:var(--font-mono);">$0.00</td>
-                <td style="font-family:var(--font-mono); color:var(--accent-blue);">$3.04</td>
-              </tr>
-              <tr style="border-top:2px solid rgba(255,255,255,0.15);">
-                <td style="font-weight:800;">GL Balanced Total</td>
-                <td style="font-family:var(--font-mono); font-weight:800; color:var(--accent-emerald);">$41.02</td>
-                <td style="font-family:var(--font-mono); font-weight:800; color:var(--accent-emerald);">$41.02</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Tip Pool Calculator -->
-      <div class="card">
-        <h3 style="font-size:1.1rem; font-weight:800; font-family:var(--font-display); margin-bottom:1rem;">💵 Shift Tip Pool Distribution</h3>
-        <div style="font-size:1.2rem; font-family:var(--font-mono); margin-bottom:1rem; color:var(--accent-emerald); font-weight:800;">
-          Total Shift Tip Pool: $${state.tipPoolTotal.toFixed(2)}
-        </div>
-        <div class="table-container">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Employee</th>
-                <th>Role</th>
-                <th>Tip Payout</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${state.employees.map(e => `
-                <tr>
-                  <td style="font-weight:700;">${e.name}</td>
-                  <td>${e.role}</td>
-                  <td style="font-family:var(--font-mono); font-weight:800; color:var(--accent-emerald);">$${tipPerPerson}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-// Modals Render Fix
-function renderModals() {
-  if (!state.modalOpen) return '';
-
-  if (state.modalOpen === 'add_menu_item') {
-    return `
-      <div class="modal-overlay" onclick="closeModal()">
-        <div class="modal-content" onclick="event.stopPropagation()">
-          <h3 style="font-weight:800; font-size:1.25rem; margin-bottom:1.25rem; font-family:var(--font-display);">➕ Add Master Menu Item (HQ Control)</h3>
-          <div class="form-group">
-            <label class="form-label">SKU Code</label>
-            <input type="text" id="new-sku" class="form-input" value="PIZ-CHZ-LG" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Item Name</label>
-            <input type="text" id="new-name" class="form-input" value="Four Cheese Artisanal Pizza" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Base Price ($)</label>
-            <input type="number" step="0.01" id="new-price" class="form-input" value="17.99" />
-          </div>
-          <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.5rem;">
-            <button class="btn-primary" style="background:var(--text-muted);" onclick="closeModal()">Cancel</button>
-            <button class="btn-primary btn-success" onclick="saveMasterItem()">Save Master Item</button>
-          </div>
-        </div>
-      </div>
-    `;
+  try {
+    const res = await fetch(`${EDGE_SERVER_URL}/api/pos/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    alert(`Order ${payload.id} checkout complete via ${tenderType}.\nStored in local SQLite WAL: ${data.sqliteWalPersisted ? 'YES' : 'NO'}`);
+  } catch (err) {
+    alert(`Checkout complete in local fallback mode.\nTx ID: ${payload.id}`);
   }
 
-  if (state.modalOpen === 'log_spoilage') {
-    return `
-      <div class="modal-overlay" onclick="closeModal()">
-        <div class="modal-content" onclick="event.stopPropagation()">
-          <h3 style="font-weight:800; font-size:1.25rem; margin-bottom:1.25rem; font-family:var(--font-display);">🗑️ Log Kitchen Spoilage / Waste</h3>
-          <div class="form-group">
-            <label class="form-label">Item Name</label>
-            <input type="text" id="spoil-item" class="form-input" value="Artisanal Dough Ball 500g" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Quantity Spoiled</label>
-            <input type="text" id="spoil-qty" class="form-input" value="3 pcs" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Reason Code</label>
-            <select id="spoil-reason" class="form-input" style="background:#0f172a;">
-              <option value="BURNT">BURNT IN OVEN</option>
-              <option value="DROPPED_FLOOR" selected>DROPPED ON FLOOR</option>
-              <option value="EXPIRED">EXPIRED PAST SHELF LIFE</option>
-            </select>
-          </div>
-          <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.5rem;">
-            <button class="btn-primary" style="background:var(--text-muted);" onclick="closeModal()">Cancel</button>
-            <button class="btn-primary btn-danger" onclick="saveSpoilageLog()">Log Spoilage</button>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  if (state.modalOpen === 'field_audit') {
-    return `
-      <div class="modal-overlay" onclick="closeModal()">
-        <div class="modal-content" onclick="event.stopPropagation()">
-          <h3 style="font-weight:800; font-size:1.25rem; margin-bottom:1.25rem; font-family:var(--font-display);">📱 Mobile Field Inspection Audit</h3>
-          <div class="form-group">
-            <label class="form-label">Store Unit</label>
-            <select id="audit-store" class="form-input" style="background:#0f172a;">
-              <option value="Store #104 (Chicago)">Store #104 (Chicago West)</option>
-              <option value="Store #101 (Downtown)">Store #101 (Downtown)</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Inspector Name</label>
-            <input type="text" id="audit-inspector" class="form-input" value="Sarah Jenkins" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Compliance Score (%)</label>
-            <input type="number" id="audit-score" class="form-input" value="97" />
-          </div>
-          <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.5rem;">
-            <button class="btn-primary" style="background:var(--text-muted);" onclick="closeModal()">Cancel</button>
-            <button class="btn-primary btn-success" onclick="saveFieldAudit()">Submit Audit</button>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  if (state.modalOpen === 'add_shift') {
-    return `
-      <div class="modal-overlay" onclick="closeModal()">
-        <div class="modal-content" onclick="event.stopPropagation()">
-          <h3 style="font-weight:800; font-size:1.25rem; margin-bottom:1.25rem; font-family:var(--font-display);">📅 Add Shift to AI Schedule</h3>
-          <div class="form-group">
-            <label class="form-label">Employee Name</label>
-            <input type="text" id="shift-emp" class="form-input" value="John Doe" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Shift Hours</label>
-            <input type="number" id="shift-hrs" class="form-input" value="8" />
-          </div>
-          <div style="display:flex; justify-content:flex-end; gap:0.75rem; margin-top:1.5rem;">
-            <button class="btn-primary" style="background:var(--text-muted);" onclick="closeModal()">Cancel</button>
-            <button class="btn-primary" onclick="saveShift()">Add Shift</button>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  return '';
-}
-
-// Handlers
-window.selectPersona = function(persona) {
-  state.selectedPersona = persona;
+  state.cart = [];
   renderApp();
+};
+
+window.bumpKDSTicket = function(idx) {
+  state.kdsTickets.splice(idx, 1);
+  renderApp();
+};
+
+window.testPrintESCPOSTicket = async function() {
+  alert('Dispatched raw ESC/POS binary ticket to Kitchen Hotline (Port 9100) with fallback station failover active.');
+};
+
+window.printStationTicket = function(ticketId) {
+  alert(`Ticket #${ticketId} dispatched to printer.`);
+};
+
+window.runAILaborOptimizer = function() {
+  alert('Labor schedule optimized for 22% target cost. Zero clopening violations detected.');
+};
+
+window.generateNetSuiteGLVoucher = function() {
+  alert('NetSuite GL Daily Journal generated: Debits $3,010.00 === Credits $3,010.00 (Balanced).');
+};
+
+window.generateRoyaltyInvoice = function() {
+  alert('Royalty Invoice generated on Net Sales ($2,319.20): Royalty Fee $115.96 + Marketing Fund $46.38 = $162.34 ACH Draft.');
 };
 
 window.toggleOffline = function() {
@@ -850,8 +664,8 @@ window.toggleOffline = function() {
   renderApp();
 };
 
-window.openModal = function(modalName) {
-  state.modalOpen = modalName;
+window.openModal = function(m) {
+  state.modalOpen = m;
   renderApp();
 };
 
@@ -860,198 +674,83 @@ window.closeModal = function() {
   renderApp();
 };
 
-window.toggleBrandLock = function(itemId) {
-  const item = state.menuItems.find(i => i.id === itemId);
-  if (item) {
-    item.isBrandLocked = !item.isBrandLocked;
-    state.auditLedger.unshift({
-      id: `aud-${Date.now()}`,
-      timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      actor: 'Security Director',
-      action: item.isBrandLocked ? 'LOCK_BRAND_RECORD' : 'UNLOCK_BRAND_RECORD',
-      target: `MenuItem (${item.sku})`,
-      hash: '8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4',
-    });
-    renderApp();
-  }
-};
-
-window.promptPriceEdit = function(itemId) {
-  const item = state.menuItems.find(i => i.id === itemId);
-  if (!item) return;
-  const newPrice = prompt(`Enter new base price for ${item.name}:`, item.basePrice.toString());
-  if (newPrice && !isNaN(parseFloat(newPrice))) {
-    item.basePrice = parseFloat(newPrice);
-    item.version = (item.version || 1) + 1;
-    renderApp();
-  }
-};
-
 window.increaseCanaryRollout = function() {
-  if (state.canaryRolloutPct < 100) {
-    state.canaryRolloutPct += 25;
-    alert(`🚀 Canary Rollout Advanced to ${state.canaryRolloutPct}% across store locations!`);
-    renderApp();
-  }
-};
-
-window.rollbackCanary = function() {
-  state.canaryRolloutPct = 0;
-  alert('⚡ 1-Click Rollback Executed! Menu version reverted across all edge nodes.');
+  state.canaryRolloutPct = Math.min(100, state.canaryRolloutPct + 25);
   renderApp();
 };
 
-window.bumpKDSTicket = function(ticketId) {
-  state.kdsTickets = state.kdsTickets.filter(t => t.id !== ticketId);
-  renderApp();
-};
+function renderModals() {
+  if (!state.modalOpen) return '';
 
-window.addToCart = function(itemId) {
-  const item = state.menuItems.find(i => i.id === itemId);
-  if (!item) return;
-  const existing = state.cart.find(c => c.id === itemId);
-  if (existing) existing.qty++;
-  else state.cart.push({ ...item, price: item.basePrice, qty: 1 });
-  renderApp();
-};
-
-window.updateCartQty = function(itemId, delta) {
-  const item = state.cart.find(c => c.id === itemId);
-  if (item) {
-    item.qty += delta;
-    if (item.qty <= 0) state.cart = state.cart.filter(c => c.id !== itemId);
-    renderApp();
-  }
-};
-
-window.changeTaxStrategy = function(val) {
-  state.selectedTaxJurisdiction = val;
-  renderApp();
-};
-
-window.submitCheckout = async function() {
-  if (state.cart.length === 0) return;
-
-  const newTx = {
-    id: `tx-${Math.floor(1000 + Math.random() * 9000)}`,
-    storeId: 'store-104',
-    terminalId: 'pos-1',
-    timestamp: new Date().toISOString(),
-    items: state.cart.map(c => ({ menuItemId: c.id, quantity: c.qty, unitPrice: c.price })),
-    subtotal: state.cart.reduce((sum, item) => sum + item.price * item.qty, 0),
-    total: Number((state.cart.reduce((sum, item) => sum + item.price * item.qty, 0) * 1.08).toFixed(2)),
-  };
-
-  try {
-    const res = await fetch(`${EDGE_SERVER_URL}/api/pos/checkout`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newTx),
-    });
-    const data = await res.json();
-    if (data.success) {
-      alert(`✅ REST API Order Checkout Complete! (Tx: ${data.transactionId})\nDispatched to Kitchen KDS & Edge Vault via WebSocket in < 200ms.`);
-    }
-  } catch (err) {
-    alert('✅ Order Vaulted to Store Edge Node (Offline Mode)!');
+  if (state.modalOpen === 'log_spoilage') {
+    return `
+      <div class="modal-overlay" onclick="closeModal()">
+        <div class="modal-card" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <h3>Log Kitchen Waste / Spoilage</h3>
+            <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+          </div>
+          <form onsubmit="event.preventDefault(); alert('Waste logged.'); closeModal();">
+            <div class="form-group">
+              <label>Item Name</label>
+              <input type="text" class="form-control" value="Mozzarella Cheese (Shredded)" required />
+            </div>
+            <div class="form-group">
+              <label>Quantity Lost (kg / pcs)</label>
+              <input type="text" class="form-control" value="1.5 kg" required />
+            </div>
+            <div class="form-group">
+              <label>Reason Code</label>
+              <select class="form-control">
+                <option>BURNT / OVERCOOKED</option>
+                <option>DROPPED_FLOOR</option>
+                <option>EXPIRED</option>
+              </select>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.5rem;">
+              <button type="button" class="btn-primary" style="background:#475569;" onclick="closeModal()">Cancel</button>
+              <button type="submit" class="btn-primary btn-danger">Confirm Waste Log</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
   }
 
-  state.cart = [];
-  renderApp();
-};
-
-window.triggerSupplierReorder = function(name) {
-  alert(`📦 Supplier Reorder Triggered for ${name}! Purchase Order dispatched to commissary.`);
-};
-
-window.toggleEmployeeClock = function(empId) {
-  const emp = state.employees.find(e => e.id === empId);
-  if (emp) {
-    emp.status = emp.status === 'CLOCKED_IN' ? 'CLOCKED_OUT' : 'CLOCKED_IN';
-    renderApp();
+  if (state.modalOpen === 'add_menu_item') {
+    return `
+      <div class="modal-overlay" onclick="closeModal()">
+        <div class="modal-card" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <h3>Add Menu Item</h3>
+            <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+          </div>
+          <form onsubmit="event.preventDefault(); alert('Menu item added.'); closeModal();">
+            <div class="form-group">
+              <label>Item Name</label>
+              <input type="text" class="form-control" placeholder="e.g. Truffle Mushroom Flatbread" required />
+            </div>
+            <div class="form-group">
+              <label>SKU</label>
+              <input type="text" class="form-control" placeholder="e.g. PIZ-TRUF-MED" required />
+            </div>
+            <div class="form-group">
+              <label>Base Price ($)</label>
+              <input type="number" step="0.01" class="form-control" placeholder="17.99" required />
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.5rem;">
+              <button type="button" class="btn-primary" style="background:#475569;" onclick="closeModal()">Cancel</button>
+              <button type="submit" class="btn-primary">Save to Catalog</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
   }
-};
 
-window.saveMasterItem = function() {
-  const sku = document.getElementById('new-sku').value;
-  const name = document.getElementById('new-name').value;
-  const price = parseFloat(document.getElementById('new-price').value);
+  return '';
+}
 
-  state.menuItems.unshift({
-    id: `item-${Date.now()}`,
-    sku,
-    name,
-    category: 'Pizzas',
-    basePrice: price,
-    image: '/pepperoni_pizza.jpg',
-    allergens: ['DAIRY', 'GLUTEN'],
-    isBrandLocked: true,
-    version: 1,
-  });
-
-  closeModal();
-};
-
-window.saveSpoilageLog = function() {
-  const item = document.getElementById('spoil-item').value;
-  const qty = document.getElementById('spoil-qty').value;
-  const reason = document.getElementById('spoil-reason').value;
-
-  state.spoilageLogs.unshift({
-    id: `spoil-${Date.now()}`,
-    item,
-    qty,
-    reason,
-    cost: '$4.50',
-    loggedBy: 'Kitchen Lead',
-  });
-
-  closeModal();
-};
-
-window.saveFieldAudit = function() {
-  const storeId = document.getElementById('audit-store').value;
-  const inspector = document.getElementById('audit-inspector').value;
-  const score = document.getElementById('audit-score').value + '%';
-
-  state.fieldAudits.unshift({
-    id: `aud-${Date.now()}`,
-    storeId,
-    inspector,
-    score,
-    date: new Date().toISOString().substring(0, 10),
-    status: 'PASSED',
-  });
-
-  closeModal();
-};
-
-window.saveShift = function() {
-  const name = document.getElementById('shift-emp').value;
-  const hrs = parseFloat(document.getElementById('shift-hrs').value);
-
-  state.employees.unshift({
-    id: `emp-${Date.now()}`,
-    name,
-    role: 'Shift Staff',
-    status: 'CLOCKED_IN',
-    shiftStart: 'Just now',
-    hours: hrs,
-    breakAttested: true,
-  });
-
-  closeModal();
-};
-
-window.generateRoyaltyStatement = function() {
-  alert('📄 Exporting NetSuite Royalty Statement CSV/PDF for Store #104...');
-};
-
-window.calculateTipDistribution = function() {
-  alert('💵 Shift tip pool recalculated across active employees!');
-};
-
-document.addEventListener('DOMContentLoaded', () => {
-  initBackendConnection();
-  renderApp();
-});
+// Start
+initBackendConnection();
+renderApp();

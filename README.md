@@ -1,61 +1,60 @@
-# 🏛️ Enterprise Multi-Unit Restaurant Management System (RMS)
+# Restaurant Management System (RMS) - Multi-Unit Edge Architecture
 
 [![CI Build](https://github.com/Alokkr00/Restaurant-Management-system/actions/workflows/ci.yml/badge.svg)](https://github.com/Alokkr00/Restaurant-Management-system/actions)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4-blue.svg)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg)](https://vitejs.dev/)
 [![SQLite WAL](https://img.shields.io/badge/SQLite-WAL_Mode-003B57.svg)](https://www.sqlite.org/wal.html)
-[![Vitest](https://img.shields.io/badge/Vitest-34%20Tests%20Passing-78C370.svg)](https://vitest.dev/)
+[![Vitest](https://img.shields.io/badge/Vitest-26%20Tests%20Passing-78C370.svg)](https://vitest.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-An **Enterprise Distributed Hybrid Infrastructure Platform** engineered for 500+ multi-unit restaurant brands, regional concepts, and franchise networks. 
+A hybrid on-premise and cloud restaurant management system designed for multi-unit franchise networks and restaurant holding groups.
 
-Built with an **Offline-First Local Edge Daemon (`store-edge-daemon`)**, **Native SQLite Write-Ahead Logging (`WAL`) persistence with Background Cloud Sync**, **Direct ESC/POS Binary Thermal Printer Drivers with Station Failover**, and **Deep Restaurant Operations & Fintech Engines**.
-
----
-
-## 💡 Engineering Motivation & Domain Case Study
-
-### 1. Why Offline-First Local Edge Nodes?
-During peak lunch hours (12:00 PM – 1:30 PM), public cloud networks, payment gateway APIs, and internet service providers (ISPs) suffer latency spikes or unexpected WAN outages. Traditional cloud-only SaaS POS systems fail completely when internet access drops, locking cashier terminals and grinding kitchen operations to a halt.
-
-**Enterprise RMS solves this with localized edge sovereignty:**
-- Every store location operates its own dedicated fanless mini-PC running an embedded **SQLite WAL Daemon** (`store-edge.db`).
-- POS terminals and Kitchen Display Systems (KDS) communicate locally over store LAN WebSockets with **sub-200ms latency**.
-- Transactions, inventory depletions, and shift timecards are written atomically to local disk first. 
-- **Background Async Sync Worker**: An automatic background sync daemon continuously flushes offline transactions (`synced = 0`) to the cloud upon WAN restoration without blocking staff.
+The system uses an offline-first local edge daemon (`store-edge-daemon`) running SQLite in Write-Ahead Logging (WAL) mode for low-latency store operations, a background reconciliation worker for cloud synchronization, ESC/POS hardware printer drivers with station failover, and operational back-office engines covering FLSA-compliant tip pooling, state overtime rules, NetSuite double-entry GL journals, and cash drawer management.
 
 ---
 
-## 🏛️ System Architecture
+## Architectural Motivation
+
+Cloud-only POS systems introduce a single point of failure during internet service provider (ISP) degradation or payment gateway outages. During peak lunch and dinner rushes, offline durability is critical to prevent halted kitchen prep and blocked checkout lines.
+
+This repository implements a store-level edge node architecture:
+- Each store operates a local node running an embedded SQLite database (`store-edge.db`) configured in Write-Ahead Logging (WAL) mode.
+- POS registers and Kitchen Display System (KDS) screens communicate over local LAN WebSockets with sub-200ms latency.
+- Transactions, inventory depletions, and shift timecards are written locally first.
+- A background worker (`EdgeCloudSyncWorker`) monitors unsynced records (`synced = 0`) and flushes transaction batches to central cloud endpoints when WAN connectivity is available.
+
+---
+
+## System Architecture
 
 ```mermaid
 flowchart TD
     subgraph Cloud["HQ Central Cloud Infrastructure"]
-        HQ_API["HQ Fastify Cloud Engine"]
-        HQ_DB[("PostgreSQL Multi-Tenant DB")]
-        NATS["NATS JetStream Event Stream"]
-        NS_INT["Oracle NetSuite GL Balanced Engine"]
-        ADP_INT["ADP State-Aware Payroll Exporter"]
+        HQ_API["HQ Cloud Engine"]
+        HQ_DB[("PostgreSQL Database")]
+        NATS["NATS JetStream Event Bus"]
+        NS_INT["NetSuite GL Integration"]
+        ADP_INT["ADP Payroll Integration"]
     end
 
-    subgraph Store104["Store #104 LAN Edge Appliance (Chicago West)"]
+    subgraph Store104["Store LAN Edge Appliance"]
         EDGE_DAEMON["Store Edge Daemon (Node.js)"]
-        SYNC_WORKER["Async Cloud Sync Worker (5s Poll)"]
-        SQLITE_WAL[("SQLite WAL Engine (store-edge.db)")]
-        WS_LAN["WebSocket Ticket Router (< 200ms)"]
-        ESC_PRINT["ESC/POS Hotline Printer (Port 9100)"]
-        ESC_EXPO["ESC/POS Expo Backup (Auto-Fallback)"]
-        POS_TERM["Touch POS & Cash Drawer (Z-Report)"]
-        KDS_SCREEN["Kitchen Display System (KDS)"]
+        SYNC_WORKER["Async Sync Worker (5s loop)"]
+        SQLITE_WAL[("SQLite WAL (store-edge.db)")]
+        WS_LAN["WebSocket Ticket Router (<200ms)"]
+        ESC_HOTLINE["ESC/POS Hotline Printer (Port 9100)"]
+        ESC_EXPO["ESC/POS Expo Backup (Failover)"]
+        POS_TERM["POS Register & Cash Drawer"]
+        KDS_SCREEN["Kitchen Display Screen (KDS)"]
     end
 
     POS_TERM -->|REST / WS| EDGE_DAEMON
-    EDGE_DAEMON -->|Atomic Disk Writes| SQLITE_WAL
-    EDGE_DAEMON -->|Instant LAN Ticket Broadcast| WS_LAN --> KDS_SCREEN
-    EDGE_DAEMON -->|Station Routing + Auto-Failover| ESC_PRINT
-    ESC_PRINT -.->|Paper Out Failover| ESC_EXPO
+    EDGE_DAEMON -->|Atomic Write| SQLITE_WAL
+    EDGE_DAEMON -->|LAN Broadcast| WS_LAN --> KDS_SCREEN
+    EDGE_DAEMON -->|Primary Print| ESC_HOTLINE
+    ESC_HOTLINE -.->|Paper Out Failover| ESC_EXPO
     EDGE_DAEMON --> SYNC_WORKER
-    SYNC_WORKER <-->|Asymmetric Event Replication| NATS <--> HQ_API
+    SYNC_WORKER <-->|Asymmetric Sync| NATS <--> HQ_API
     HQ_API --> HQ_DB
     HQ_API --> NS_INT
     HQ_API --> ADP_INT
@@ -63,91 +62,104 @@ flowchart TD
 
 ---
 
-## 📑 Architecture Decision Records (ADRs)
+## Architecture Decision Records (ADRs)
 
-Key architectural tradeoffs and technical decisions are documented in formal ADRs:
+Detailed technical decisions and architectural tradeoffs are documented in the `docs/adr/` directory:
 
-- **[ADR 001: SQLite WAL Mode over PostgreSQL on Edge Appliances](docs/adr/001-sqlite-wal-over-postgres-on-edge.md)** — Evaluates memory footprint (<15MB), single-writer WAL throughput, and instant crash recovery without DB admin overhead.
-- **[ADR 002: Vector-Clock & Hybrid Logical Clocks for Multi-Outlet Sync](docs/adr/002-vector-clock-conflict-resolution.md)** — Solves store physical clock drift and enforces HQ Brand-Lock priority rules.
-- **[ADR 003: Direct ESC/POS TCP Socket Printing vs Cloud Print Microservices](docs/adr/003-escpos-tcp-over-cloud-printing.md)** — Replaces high-latency cloud print microservices with raw binary buffer dispatch over TCP Port 9100.
-
----
-
-## 🚀 Key Domain Engines
-
-### 1. 💵 Cash Management & Blind EOD Z-Reports (`src/pos/cash-management.ts`)
-- **Full Cash Drawer Lifecycle**: Manages opening banks ($200 float), mid-shift safe drops, and petty cash pay-outs with manager reason codes.
-- **Blind EOD Z-Report Reconciliation**: Cashier performs a blind physical cash count (without previewing expected drawer cash) to prevent skimming, flagging over/short variances $\ge \pm \$5.00$.
-
-### 2. 🍕 Audited Comps, Voids & Complex Modifiers (`src/pos/order-lifecycle.ts`)
-- **Comps vs Voids Separation**: Distinguishes kitchen-made food waste (inventory depleted, logged to spoilage) from pre-cook order cancellations (inventory restored).
-- **Complex Modifiers**: Supports modifier groups, exclusions (`NO Onion`), substitutions (`SUB Vegan Cheese`), and half-and-half pizza toppings (`LEFT_HALF`, `RIGHT_HALF`, `WHOLE`).
-
-### 3. ⚖️ FLSA-Compliant Tip Pooling (`src/fintech/tip-pooling-engine.ts`)
-- **Strict Managerial Ban**: Enforces FLSA §3(m)(2)(B), barring managers, shift leads, and supervisors from employee tip pools.
-- **Tip Credit Rules**: Prohibits BOH kitchen staff from sharing tips when the employer claims a FOH tip credit against minimum wage.
-
-### 4. 📈 State-Aware Overtime & Split Rates (`src/integrations/adp.ts`)
-- **California Daily Overtime**: Calculates daily OT (>8h @ 1.5x, >12h @ 2.0x) grouped across multi-shift workdays.
-- **Blended Regular Rates**: Computes weighted blended hourly rates for multi-role employees (e.g. Cashier @ $15/hr + Cook @ $25/hr).
-
-### 5. 📊 Balanced NetSuite Double-Entry GL (`src/integrations/netsuite.ts`)
-- **Double-Entry Balance Guarantee**: $\sum \text{Debits} \equiv \sum \text{Credits}$ across Cash on Hand (1010), Card Clearing (1020), 3rd-Party Delivery AR (1030), Tip Liability (2020), Sales Tax (2010), and Food Revenue (4010).
-
-### 6. 📦 Multi-Tier UOM Conversions & Par Levels (`src/inventory/uom-conversion.ts`)
-- **Cascading UOM Engine**: Converts Purchasing Units (e.g. 50lb Flour Bag) $\longrightarrow$ Storage Units (Pounds/Kilos) $\longrightarrow$ Recipe Depletion (Grams/Ounces).
-- **Dynamic Morning Par Targets**: Forecasted Sales $\times$ Prep Velocity $\times$ Safety Buffer (15%) $\longrightarrow$ Daily Prep Targets.
+- **[ADR 001: SQLite WAL Mode over PostgreSQL on Edge](docs/adr/001-sqlite-wal-over-postgres-on-edge.md)** — Embedded memory footprint (<15MB), single-writer serial throughput, and crash recovery.
+- **[ADR 002: Vector-Clock & Hybrid Logical Clocks for Sync](docs/adr/002-vector-clock-conflict-resolution.md)** — Handling physical clock drift and enforcing HQ brand lock priority.
+- **[ADR 003: Direct ESC/POS TCP Socket Printing](docs/adr/003-escpos-tcp-over-cloud-printing.md)** — Direct socket binary printing over LAN Port 9100 with hardware status polling.
 
 ---
 
-## 🧪 Automated Testing & Quality Assurance
+## Key Modules and Domain Logic
 
-The suite features 100% green automated coverage with **34 tests across 9 test files**:
+### 1. Cash Drawer Management (`src/pos/cash-management.ts`)
+- Manages drawer opening float banks, mid-shift safe drops, and petty cash payouts with manager approval reason codes.
+- Generates blind End-of-Day (EOD) Z-Reports where cashiers count physical currency without previewing expected system totals, computing over/short variance.
+
+### 2. Order Lifecycle & Audited Comps (`src/pos/order-lifecycle.ts`)
+- Distinguishes **Voids** (item not prepared, inventory restored) from **Comps** (item prepared and served, inventory depleted).
+- Handles complex modifier hierarchies, ingredient exclusions (`NO Onion`), substitutions (`SUB Vegan Cheese`), and split pizza toppings (`LEFT_HALF`, `RIGHT_HALF`, `WHOLE`).
+
+### 3. FLSA Tip Pooling Compliance (`src/fintech/tip-pooling-engine.ts`)
+- Enforces FLSA Section 3(m)(2)(B) excluding managers and shift leads with supervisory authority from tip pools.
+- Enforces tip credit regulations restricting back-of-house staff from tip pools when an employer claims a tip credit against minimum wage.
+
+### 4. Overtime & Blended Pay Rates (`src/integrations/adp.ts`)
+- Implements California daily overtime rules (>8 hours/day at 1.5x, >12 hours/day at 2.0x) aggregated across multi-shift workdays.
+- Computes blended regular rates of pay for employees working multiple roles at different wage rates in the same pay period.
+
+### 5. NetSuite Double-Entry GL Journal (`src/integrations/netsuite.ts`)
+- Generates balanced daily general ledger journals ($\sum \text{Debits} \equiv \sum \text{Credits}$) across Cash on Hand (1010), Merchant Card Clearing (1020), 3rd-Party Delivery AR (1030), Tip Liability (2020), Sales Tax Payable (2010), and Food Revenue (4010).
+
+### 6. Unit of Measure (UOM) Conversions (`src/inventory/uom-conversion.ts`)
+- Cascades conversions from purchasing packaging (e.g. 50lb bag) to storage inventory (pounds/kilograms) to recipe depletion (grams/ounces).
+- Computes dynamic morning prep par levels from sales forecasts and historical item velocity.
+
+---
+
+## Test Coverage
+
+The test suite contains 26 tests across 13 domain-organized test files:
 
 ```bash
-# Run Vitest test suite
 npm test
 ```
 
 ```text
- RUN  v1.6.1 E:/Frenchize management system
+ ✓ tests/netsuite-gl.test.ts        (1 test passed)
+ ✓ tests/inventory-recipe.test.ts   (2 tests passed)
+ ✓ tests/tip-pooling.test.ts        (2 tests passed)
+ ✓ tests/sync-engine.test.ts        (2 tests passed)
+ ✓ tests/adp-payroll.test.ts        (2 tests passed)
+ ✓ tests/escpos-printer.test.ts     (3 tests passed)
+ ✓ tests/tenant-isolation.test.ts   (3 tests passed)
+ ✓ tests/royalty.test.ts            (1 test passed)
+ ✓ tests/labor-compliance.test.ts   (2 tests passed)
+ ✓ tests/order-lifecycle.test.ts    (2 tests passed)
+ ✓ tests/tax-engine.test.ts         (3 tests passed)
+ ✓ tests/uom-conversion.test.ts     (2 tests passed)
+ ✓ tests/cash-management.test.ts    (1 test passed)
 
- ✓ tests/sync-spike.test.ts                  (4 tests passed)
- ✓ tests/phase1-compliance-financial.test.ts (6 tests passed) -> FLSA Tips, CA Daily OT & NetSuite GL
- ✓ tests/hardware-drivers.test.ts            (4 tests passed) -> SQLite WAL & ESC/POS Station Failover
- ✓ tests/phase2-sprint1.test.ts              (4 tests passed)
- ✓ tests/phase3-kitchen-pos-ops.test.ts      (5 tests passed) -> Cash Drawer Z-Reports, Modifiers & UOM
- ✓ tests/phase2-sprint2.test.ts              (3 tests passed)
- ✓ tests/tenant-isolation.test.ts            (3 tests passed)
- ✓ tests/production-hardening.test.ts        (3 tests passed)
- ✓ tests/phase3.test.ts                      (2 tests passed)
-
- Test Files  9 passed (9)
-      Tests  34 passed (34)
+ Test Files  13 passed (13)
+      Tests  26 passed (26)
 ```
 
 ---
 
-## 🛠️ Local Development & Quick Start
+## Getting Started
 
+### Requirements
+- Node.js >= 20.x
+- npm >= 10.x
+
+### Setup
 ```bash
-# 1. Clone and Install
 git clone https://github.com/Alokkr00/Restaurant-Management-system.git
 cd Restaurant-Management-system
 npm install
+```
 
-# 2. Run Store Edge Daemon
+### Development
+```bash
+# Start edge node daemon (SQLite WAL active on port 3001)
 npm run dev:edge
 
-# 3. Run Web Application Interface
+# Start web interface (Vite on port 5173)
 npm run dev:ui
 
-# 4. Run Test Suite
+# Run test suite
 npm test
+```
+
+### Docker Deployment
+```bash
+docker-compose -f docker-compose.edge.yml up -d
 ```
 
 ---
 
-## 📜 License
+## License
 
-Distributed under the MIT License. See [`LICENSE`](LICENSE) for details.
+MIT License. See [LICENSE](LICENSE) for details.
