@@ -4,12 +4,28 @@ const EDGE_SERVER_URL = 'http://localhost:3001';
 const EDGE_WS_URL = 'ws://localhost:3001';
 
 const state = {
-  activeModule: 'pos_register', // pos_register | kds | inventory_prep | labor_shifts | menu_catalog | franchise_financials | field_audit | franchise_overview
+  activeModule: 'pos_register', // pos_register | kds | cash_management | inventory_prep | labor_shifts | menu_catalog | franchise_financials
+  activeCategory: 'ALL', // ALL | Pizzas | Appetizers | Beverages
+  activeKDSStation: 'ALL', // ALL | HOTLINE_1 | EXPO
   storeOffline: false,
   apiConnected: false,
   wsConnected: false,
-  modalOpen: null, // null | 'add_menu_item' | 'field_audit' | 'log_spoilage' | 'add_shift' | 'cash_drop'
+  modalOpen: null, // null | 'add_menu_item' | 'log_spoilage' | 'cash_drop' | 'blind_z_report' | 'item_modifiers'
+  selectedModifierItem: null,
+  activeModifiers: [],
   selectedTaxJurisdiction: 'US_SALES_TAX',
+  
+  // Drawer state
+  drawerSession: {
+    sessionId: 'drawer-pos1-001',
+    startingBankUSD: 200.0,
+    cashSalesUSD: 350.0,
+    cashDropsUSD: 100.0,
+    payOutsUSD: 20.0,
+    expectedCashUSD: 430.0,
+    status: 'OPEN',
+  },
+
   menuItems: [
     { id: 'item-101', sku: 'PIZ-PEP-LG', name: 'Large Pepperoni Pizza', category: 'Pizzas', basePrice: 18.99, image: '/pepperoni_pizza.jpg', allergens: ['DAIRY', 'GLUTEN'], isBrandLocked: true, version: 3 },
     { id: 'item-102', sku: 'PIZ-MAR-LG', name: 'Margherita Artisanal', category: 'Pizzas', basePrice: 16.50, image: '/pepperoni_pizza.jpg', allergens: ['DAIRY', 'GLUTEN'], isBrandLocked: true, version: 2 },
@@ -18,13 +34,44 @@ const state = {
   ],
   cart: [],
   kdsTickets: [
-    { id: 'tx-1001', source: 'POS Terminal 01', time: '2 mins ago', brandBadge: 'Artisanal Pizza Co.', items: [{ qty: 1, name: 'Large Pepperoni Pizza', allergens: ['DAIRY', 'GLUTEN'] }], urgent: false, status: 'IN_PREP' },
-    { id: 'deliv-dd-9812', source: 'DoorDash Aggregator', time: '1 min ago', brandBadge: 'Wild Wings Express', items: [{ qty: 2, name: 'Spicy Buffalo Wings (10pc)' }, { qty: 1, name: 'Craft Garlic Knots (6pc)' }], urgent: true, status: 'IN_PREP' },
+    { 
+      id: 'tx-1001', 
+      source: 'POS Register 01', 
+      station: 'HOTLINE_1', 
+      elapsedMinutes: 3, 
+      elapsedSeconds: 24, 
+      diningType: 'DINE IN (Table 4)', 
+      items: [{ qty: 1, name: 'Large Pepperoni Pizza', modifiers: ['+ Extra Cheese', 'Well Done'], allergens: ['DAIRY', 'GLUTEN'] }], 
+      status: 'IN_PREP' 
+    },
+    { 
+      id: 'deliv-dd-9812', 
+      source: 'DoorDash Aggregator', 
+      station: 'EXPO', 
+      elapsedMinutes: 8, 
+      elapsedSeconds: 45, 
+      diningType: 'DOORDASH DELIVERY', 
+      items: [
+        { qty: 2, name: 'Spicy Buffalo Wings (10pc)', modifiers: ['Ranch on Side', 'Extra Crispy'] }, 
+        { qty: 1, name: 'Craft Garlic Knots (6pc)', allergens: ['GLUTEN'] }
+      ], 
+      status: 'IN_PREP' 
+    },
+    { 
+      id: 'tx-1003', 
+      source: 'Online Web Order', 
+      station: 'HOTLINE_1', 
+      elapsedMinutes: 14, 
+      elapsedSeconds: 12, 
+      diningType: 'TO GO PICKUP', 
+      items: [{ qty: 1, name: 'Margherita Artisanal', modifiers: ['NO Basil', '+ Garlic Drizzle'], allergens: ['DAIRY', 'GLUTEN'] }], 
+      status: 'LATE' 
+    },
   ],
   inventoryVariances: [
-    { ingredientId: 'ing-cheese', name: 'Mozzarella Cheese (Shredded)', theoretical: 14.2, actual: 15.8, unit: 'kg', variancePct: '+11.2%', alert: true },
-    { ingredientId: 'ing-pep', name: 'Pepperoni Slices (Beef/Pork)', theoretical: 8.5, actual: 8.6, unit: 'kg', variancePct: '+1.1%', alert: false },
-    { ingredientId: 'ing-flour', name: 'High-Gluten Flour Batch', theoretical: 45.0, actual: 48.2, unit: 'kg', variancePct: '+7.1%', alert: true },
+    { ingredientId: 'ing-cheese', name: 'Mozzarella Cheese (Shredded)', theoretical: 14.2, actual: 15.8, unit: 'kg', variancePct: 11.2, alert: true },
+    { ingredientId: 'ing-pep', name: 'Pepperoni Slices (Beef/Pork)', theoretical: 8.5, actual: 8.6, unit: 'kg', variancePct: 1.1, alert: false },
+    { ingredientId: 'ing-flour', name: 'High-Gluten Flour Batch', theoretical: 45.0, actual: 48.2, unit: 'kg', variancePct: 7.1, alert: true },
   ],
   spoilageLogs: [
     { id: 'spoil-1', item: 'Dough Ball 500g', qty: '5 pcs', reason: 'DROPPED_FLOOR', cost: '$7.50', loggedBy: 'Kitchen Lead' },
@@ -34,15 +81,6 @@ const state = {
     { id: 'emp-101', name: 'John Doe', role: 'Kitchen Prep', status: 'CLOCKED_IN', shiftStart: '08:00 AM', hours: 6.5, breakAttested: true },
     { id: 'emp-102', name: 'Sarah Jenkins', role: 'Cashier', status: 'CLOCKED_IN', shiftStart: '10:00 AM', hours: 4.5, breakAttested: true },
     { id: 'emp-103', name: 'Michael Smith', role: 'Shift Lead', status: 'CLOCKED_OUT', shiftStart: 'Yesterday', hours: 8.0, breakAttested: true },
-  ],
-  auditLedger: [
-    { id: 'aud-991', timestamp: '2026-08-01 19:10:00', actor: 'HQ Menu Admin', action: 'UPDATE_PRICE', target: 'MenuItem (PIZ-PEP-LG)', hash: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' },
-    { id: 'aud-990', timestamp: '2026-08-01 18:45:00', actor: 'Brand Director', action: 'LOCK_BRAND_RECORD', target: 'Recipe (Craft Garlic Knots)', hash: '8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4' },
-  ],
-  canaryRolloutPct: 15,
-  fieldAudits: [
-    { id: 'aud-st-104', storeId: 'Store #104 (Chicago)', inspector: 'Sarah Jenkins', score: '96%', date: '2026-08-01', status: 'PASSED' },
-    { id: 'aud-st-101', storeId: 'Store #101 (Downtown)', inspector: 'Mark Vance', score: '98%', date: '2026-07-30', status: 'PASSED' },
   ],
   tipPoolTotal: 450.00,
 };
@@ -79,10 +117,15 @@ async function initBackendConnection() {
         state.kdsTickets.unshift({
           id: data.ticket.id,
           source: 'POS Terminal 01',
-          time: 'Just now',
-          brandBadge: 'Artisanal Pizza Co.',
-          items: data.ticket.items.map(i => ({ qty: i.quantity || 1, name: i.menuItemId === 'item-101' ? 'Large Pepperoni Pizza' : 'Spicy Buffalo Wings' })),
-          urgent: true,
+          station: 'HOTLINE_1',
+          elapsedMinutes: 0,
+          elapsedSeconds: 15,
+          diningType: 'DINE IN',
+          items: data.ticket.items.map(i => ({ 
+            qty: i.quantity || 1, 
+            name: i.menuItemId === 'item-101' ? 'Large Pepperoni Pizza' : 'Spicy Buffalo Wings',
+            modifiers: ['Standard Prep']
+          })),
           status: 'IN_PREP',
         });
         renderApp();
@@ -107,16 +150,16 @@ function renderApp() {
       <!-- Module Navigation Tabs -->
       <nav class="module-nav">
         <button class="nav-tab ${state.activeModule === 'pos_register' ? 'active' : ''}" onclick="selectModule('pos_register')">POS Register</button>
-        <button class="nav-tab ${state.activeModule === 'kds' ? 'active' : ''}" onclick="selectModule('kds')">Kitchen Display</button>
+        <button class="nav-tab ${state.activeModule === 'kds' ? 'active' : ''}" onclick="selectModule('kds')">Kitchen KDS (${state.kdsTickets.length})</button>
+        <button class="nav-tab ${state.activeModule === 'cash_management' ? 'active' : ''}" onclick="selectModule('cash_management')">Cash & Drawers</button>
         <button class="nav-tab ${state.activeModule === 'inventory_prep' ? 'active' : ''}" onclick="selectModule('inventory_prep')">Inventory & Prep</button>
         <button class="nav-tab ${state.activeModule === 'labor_shifts' ? 'active' : ''}" onclick="selectModule('labor_shifts')">Labor & Shifts</button>
         <button class="nav-tab ${state.activeModule === 'menu_catalog' ? 'active' : ''}" onclick="selectModule('menu_catalog')">Menu Catalog</button>
         <button class="nav-tab ${state.activeModule === 'franchise_financials' ? 'active' : ''}" onclick="selectModule('franchise_financials')">Financials & GL</button>
-        <button class="nav-tab ${state.activeModule === 'franchise_overview' ? 'active' : ''}" onclick="selectModule('franchise_overview')">Franchise Portal</button>
       </nav>
 
       <!-- Connection Status Pill -->
-      <div class="status-pill ${state.storeOffline ? 'offline' : ''}" onclick="toggleOffline()" title="Click to simulate network drop">
+      <div class="status-pill ${state.storeOffline ? 'offline' : ''}" onclick="toggleOffline()" title="Click to simulate WAN drop">
         <span class="status-dot"></span>
         <span>${state.storeOffline ? 'EDGE OFFLINE' : `EDGE ONLINE (${state.wsConnected ? 'LAN WS' : 'REST'})`}</span>
       </div>
@@ -136,46 +179,59 @@ function renderActiveModule() {
   switch (state.activeModule) {
     case 'pos_register': return renderPOSRegisterWorkspace();
     case 'kds': return renderKDSWorkspace();
+    case 'cash_management': return renderCashManagementWorkspace();
     case 'inventory_prep': return renderInventoryPrepWorkspace();
     case 'labor_shifts': return renderLaborShiftsWorkspace();
     case 'menu_catalog': return renderMenuCatalogWorkspace();
     case 'franchise_financials': return renderFinancialsWorkspace();
-    case 'franchise_overview': return renderFranchiseOverviewWorkspace();
     default: return renderPOSRegisterWorkspace();
   }
 }
 
 // 1. POS REGISTER
 function renderPOSRegisterWorkspace() {
-  const subtotal = state.cart.reduce((sum, item) => sum + item.basePrice * item.qty, 0);
-  const taxRate = state.selectedTaxJurisdiction === 'EU_VAT' ? 0.20 : state.selectedTaxJurisdiction === 'INDIA_GST' ? 0.05 : 0.08;
-  const taxAmount = subtotal * taxRate;
+  const filteredItems = state.activeCategory === 'ALL' 
+    ? state.menuItems 
+    : state.menuItems.filter(i => i.category === state.activeCategory);
+
+  const subtotal = state.cart.reduce((sum, item) => sum + (item.basePrice + (item.modifiersCost || 0)) * item.qty, 0);
+  const taxAmount = subtotal * 0.08;
   const total = subtotal + taxAmount;
 
   return `
     <div class="section-header">
       <div>
         <h2 class="section-title">Point of Sale Register</h2>
-        <p class="section-subtitle">Terminal 01 &bull; Local SQLite WAL Checkouts &bull; Offline Durability</p>
+        <p class="section-subtitle">Terminal 01 &bull; Local SQLite WAL Persistence &bull; Sub-200ms LAN Ticket Dispatch</p>
       </div>
       <div class="header-actions">
-        <span class="badge badge-online">TAX PROFILE: US SALES TAX</span>
-        <button class="btn-primary" style="background:#475569;" onclick="alert('Starting bank initialized: $200.00 float.')">Cash Drawer: $200 Bank</button>
+        <span class="badge badge-online">DRAWER OPEN: $${state.drawerSession.expectedCashUSD.toFixed(2)} EXP</span>
+        <button class="btn-primary btn-slate" onclick="openModal('cash_drop')">Mid-Shift Safe Drop</button>
       </div>
+    </div>
+
+    <!-- Category Selector Rail -->
+    <div class="category-chips-rail">
+      <button class="category-chip ${state.activeCategory === 'ALL' ? 'active' : ''}" onclick="setCategory('ALL')">All Categories</button>
+      <button class="category-chip ${state.activeCategory === 'Pizzas' ? 'active' : ''}" onclick="setCategory('Pizzas')">Pizzas</button>
+      <button class="category-chip ${state.activeCategory === 'Appetizers' ? 'active' : ''}" onclick="setCategory('Appetizers')">Appetizers & Sides</button>
+      <button class="category-chip ${state.activeCategory === 'Beverages' ? 'active' : ''}" onclick="setCategory('Beverages')">Beverages</button>
     </div>
 
     <div class="pos-layout">
       <!-- Menu Item Grid -->
       <div class="menu-grid">
-        ${state.menuItems.map(item => `
-          <div class="pos-card" onclick="addToCart('${item.id}')">
+        ${filteredItems.map(item => `
+          <div class="pos-card" onclick="openModifierModal('${item.id}')">
             <img src="${item.image}" alt="${item.name}" class="pos-card-img" />
             <div class="pos-card-body">
-              <div class="pos-card-title">${item.name}</div>
-              <div class="pos-card-category">${item.category} &bull; ${item.sku}</div>
+              <div>
+                <div class="pos-card-title">${item.name}</div>
+                <div class="pos-card-meta">${item.category} &bull; ${item.sku}</div>
+              </div>
               <div class="pos-card-footer">
                 <span class="pos-card-price">$${item.basePrice.toFixed(2)}</span>
-                <button class="btn-add">Add +</button>
+                <button class="btn-add-tile">Customize +</button>
               </div>
             </div>
           </div>
@@ -185,49 +241,75 @@ function renderPOSRegisterWorkspace() {
       <!-- Register Ticket Sidebar -->
       <div class="cart-sidebar">
         <div class="cart-header">
-          <h3 style="font-size:1.1rem; font-weight:700;">Current Order</h3>
-          <span style="font-size:0.8rem; color:var(--text-muted);">${state.cart.length} line items</span>
+          <div>
+            <h3 style="font-size:1.1rem; font-weight:800;">Current Ticket</h3>
+            <span style="font-size:0.8rem; color:var(--text-muted);">Dine In &bull; Terminal 01</span>
+          </div>
+          <button class="btn-primary btn-slate" style="padding:0.35rem 0.75rem; font-size:0.75rem;" onclick="clearCart()" ${state.cart.length === 0 ? 'disabled' : ''}>Clear</button>
         </div>
 
         <div class="cart-items">
           ${state.cart.length === 0 ? `
-            <div style="text-align:center; padding:3rem 1rem; color:var(--text-muted);">
-              <div>Ticket is empty</div>
-              <div style="font-size:0.8rem; margin-top:0.5rem;">Select items from the menu to build order</div>
+            <div style="text-align:center; padding:4rem 1rem; color:var(--text-muted);">
+              <div style="font-size:1.1rem; font-weight:700;">Ticket is empty</div>
+              <div style="font-size:0.82rem; margin-top:0.35rem;">Tap any menu item on the left to add</div>
             </div>
           ` : state.cart.map((item, idx) => `
-            <div class="cart-item">
-              <div>
-                <div style="font-weight:600; font-size:0.95rem;">${item.name}</div>
-                <div style="font-size:0.8rem; color:var(--text-muted);">$${item.basePrice.toFixed(2)} each</div>
+            <div class="cart-item-row">
+              <div class="cart-item-main">
+                <span class="cart-item-title">${item.name}</span>
+                <span class="cart-item-price">$${((item.basePrice + (item.modifiersCost || 0)) * item.qty).toFixed(2)}</span>
               </div>
-              <div style="display:flex; align-items:center; gap:0.5rem;">
-                <button class="qty-btn" onclick="updateCartQty(${idx}, -1)">-</button>
-                <span style="font-weight:700;">${item.qty}</span>
-                <button class="qty-btn" onclick="updateCartQty(${idx}, 1)">+</button>
-                <span style="font-weight:700; width:55px; text-align:right;">$${(item.basePrice * item.qty).toFixed(2)}</span>
+              ${item.modifiers && item.modifiers.length > 0 ? `
+                <div class="cart-item-modifiers">
+                  ${item.modifiers.join(', ')}
+                </div>
+              ` : ''}
+              <div class="cart-item-controls">
+                <div class="qty-control">
+                  <button class="qty-btn" onclick="updateCartQty(${idx}, -1)">-</button>
+                  <span style="font-weight:800; width:24px; text-align:center;">${item.qty}</span>
+                  <button class="qty-btn" onclick="updateCartQty(${idx}, 1)">+</button>
+                </div>
+                <span style="font-size:0.75rem; color:var(--text-muted);">$${(item.basePrice + (item.modifiersCost || 0)).toFixed(2)} ea</span>
               </div>
             </div>
           `).join('')}
         </div>
 
-        <div class="cart-totals">
+        <!-- Quick-Cash Tender Bar -->
+        <div class="quick-cash-bar">
+          <div class="quick-cash-title">Quick Cash Tender</div>
+          <div class="quick-cash-buttons">
+            <button class="btn-cash-quick" onclick="quickCashCheckout(10)" ${total > 10 || state.cart.length === 0 ? 'disabled' : ''}>$10</button>
+            <button class="btn-cash-quick" onclick="quickCashCheckout(20)" ${total > 20 || state.cart.length === 0 ? 'disabled' : ''}>$20</button>
+            <button class="btn-cash-quick" onclick="quickCashCheckout(50)" ${total > 50 || state.cart.length === 0 ? 'disabled' : ''}>$50</button>
+            <button class="btn-cash-quick" onclick="quickCashCheckout(${total})" ${state.cart.length === 0 ? 'disabled' : ''}>Exact</button>
+          </div>
+        </div>
+
+        <!-- Cart Totals & Checkout -->
+        <div class="cart-footer">
           <div class="totals-row">
-            <span>Subtotal:</span>
+            <span>Subtotal</span>
             <span>$${subtotal.toFixed(2)}</span>
           </div>
           <div class="totals-row">
-            <span>Tax (8%):</span>
+            <span>Sales Tax (8%)</span>
             <span>$${taxAmount.toFixed(2)}</span>
           </div>
-          <div class="totals-row total-highlight">
-            <span>Total Due:</span>
+          <div class="totals-row total-due">
+            <span>Total Due</span>
             <span>$${total.toFixed(2)}</span>
           </div>
 
-          <div style="display:flex; gap:0.5rem; margin-top:1rem;">
-            <button class="btn-primary" style="flex:1;" onclick="checkoutOrder('CARD')" ${state.cart.length === 0 ? 'disabled' : ''}>Charge Card ($${total.toFixed(2)})</button>
-            <button class="btn-primary" style="flex:1; background:#059669;" onclick="checkoutOrder('CASH')" ${state.cart.length === 0 ? 'disabled' : ''}>Cash Tender</button>
+          <div class="checkout-actions-grid">
+            <button class="btn-primary btn-checkout" onclick="checkoutOrder('CARD')" ${state.cart.length === 0 ? 'disabled' : ''}>
+              Charge Card
+            </button>
+            <button class="btn-primary btn-emerald btn-checkout" onclick="checkoutOrder('CASH')" ${state.cart.length === 0 ? 'disabled' : ''}>
+              Cash Tender
+            </button>
           </div>
         </div>
       </div>
@@ -235,55 +317,162 @@ function renderPOSRegisterWorkspace() {
   `;
 }
 
-// 2. KITCHEN DISPLAY (KDS)
+// 2. KITCHEN DISPLAY SYSTEM (KDS)
 function renderKDSWorkspace() {
+  const filteredTickets = state.activeKDSStation === 'ALL'
+    ? state.kdsTickets
+    : state.kdsTickets.filter(t => t.station === state.activeKDSStation);
+
   return `
     <div class="section-header">
       <div>
         <h2 class="section-title">Kitchen Display System (KDS)</h2>
-        <p class="section-subtitle">Station: Hotline 01 &bull; Real-time LAN WebSocket Ticket Routing (&lt;200ms)</p>
+        <p class="section-subtitle">Real-time LAN WebSocket Ticket Stream &bull; Sub-200ms Latency &bull; Station Routing</p>
       </div>
       <div class="header-actions">
-        <span class="badge badge-online">EXPO ROUTING: ACTIVE</span>
-        <button class="btn-primary btn-purple" onclick="testPrintESCPOSTicket()">Test ESC/POS Print (Port 9100)</button>
+        <button class="btn-primary btn-slate" onclick="testPrintESCPOSTicket()">Test Hotline Printer (Port 9100)</button>
       </div>
     </div>
 
+    <!-- KDS Station Tabs -->
+    <div class="category-chips-rail" style="margin-bottom:1.25rem;">
+      <button class="category-chip ${state.activeKDSStation === 'ALL' ? 'active' : ''}" onclick="setKDSStation('ALL')">All Kitchen Stations (${state.kdsTickets.length})</button>
+      <button class="category-chip ${state.activeKDSStation === 'HOTLINE_1' ? 'active' : ''}" onclick="setKDSStation('HOTLINE_1')">Hotline 1 (Pizza & Oven)</button>
+      <button class="category-chip ${state.activeKDSStation === 'EXPO' ? 'active' : ''}" onclick="setKDSStation('EXPO')">Expo & Aggregator Packing</button>
+    </div>
+
     <div class="kds-grid">
-      ${state.kdsTickets.map((t, idx) => `
-        <div class="kds-card ${t.urgent ? 'urgent' : ''}">
-          <div class="kds-card-header">
-            <div>
-              <div style="font-weight:700; font-size:1.05rem;">#${t.id.slice(-6)}</div>
-              <div style="font-size:0.8rem; color:var(--text-muted);">${t.source} &bull; ${t.time}</div>
+      ${filteredTickets.map((t, idx) => {
+        const isRed = t.elapsedMinutes >= 10;
+        const isAmber = t.elapsedMinutes >= 5 && t.elapsedMinutes < 10;
+        const timerClass = isRed ? 'timer-red' : isAmber ? 'timer-amber' : 'timer-green';
+        const pillClass = isRed ? 'timer-pill-red' : isAmber ? 'timer-pill-amber' : 'timer-pill-green';
+        const timerFormatted = `${String(t.elapsedMinutes).padStart(2, '0')}:${String(t.elapsedSeconds).padStart(2, '0')}`;
+
+        return `
+          <div class="kds-ticket ${timerClass}">
+            <div class="kds-ticket-header">
+              <span class="kds-ticket-id">#${t.id.slice(-6)}</span>
+              <span class="kds-ticket-timer ${pillClass}">${timerFormatted} ${isRed ? 'LATE' : ''}</span>
             </div>
-            <span class="badge ${t.urgent ? 'badge-urgent' : 'badge-normal'}">${t.status}</span>
+            <div class="kds-ticket-meta">
+              <span><strong>${t.diningType}</strong></span>
+              <span>${t.source}</span>
+            </div>
+            <div class="kds-ticket-items">
+              ${t.items.map(item => `
+                <div class="kds-item-row">
+                  <div class="kds-item-headline">
+                    <span class="kds-item-qty">${item.qty}x</span>
+                    <span>${item.name}</span>
+                  </div>
+                  ${item.allergens && item.allergens.length > 0 ? `
+                    <span class="kds-allergen-tag">ALLERGEN: ${item.allergens.join(', ')}</span>
+                  ` : ''}
+                  ${item.modifiers && item.modifiers.length > 0 ? item.modifiers.map(m => `
+                    <span class="kds-modifier-tag">${m}</span>
+                  `).join('') : ''}
+                </div>
+              `).join('')}
+            </div>
+            <button class="btn-bump" onclick="bumpKDSTicket(${idx})">
+              BUMP TICKET &check;
+            </button>
           </div>
-          <div class="kds-card-items">
-            ${t.items.map(i => `
-              <div style="display:flex; justify-content:space-between; padding:0.4rem 0; border-bottom:1px solid rgba(255,255,255,0.05);">
-                <span><strong>${i.qty}x</strong> ${i.name}</span>
-                ${i.allergens ? `<span style="color:#f87171; font-size:0.75rem;">${i.allergens.join(', ')}</span>` : ''}
-              </div>
-            `).join('')}
-          </div>
-          <div style="margin-top:1rem; display:flex; gap:0.5rem;">
-            <button class="btn-primary" style="flex:1; padding:0.5rem;" onclick="bumpKDSTicket(${idx})">Bump / Complete</button>
-            <button class="btn-primary" style="background:#475569; padding:0.5rem;" onclick="printStationTicket('${t.id}')">Print Ticket</button>
-          </div>
-        </div>
-      `).join('')}
+        `;
+      }).join('')}
     </div>
   `;
 }
 
-// 3. INVENTORY & PREP
+// 3. CASH MANAGEMENT & SHIFT RECONCILIATION
+function renderCashManagementWorkspace() {
+  return `
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Cash Drawer & Shift Reconciliation</h2>
+        <p class="section-subtitle">Drawer Sessions &bull; Mid-Shift Safe Drops &bull; Petty Cash Payouts &bull; Blind Z-Reports</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn-primary btn-slate" onclick="openModal('cash_drop')">Record Safe Drop</button>
+        <button class="btn-primary btn-emerald" onclick="openModal('blind_z_report')">Perform Blind EOD Z-Report</button>
+      </div>
+    </div>
+
+    <!-- Drawer Summary Cards -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
+      <div class="card">
+        <div style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Opening Float Bank</div>
+        <div style="font-family:var(--font-mono); font-size:1.6rem; font-weight:800; color:#ffffff; margin-top:0.25rem;">$${state.drawerSession.startingBankUSD.toFixed(2)}</div>
+        <div style="font-size:0.75rem; color:#34d399; margin-top:0.25rem;">Verified at 08:00 AM</div>
+      </div>
+      <div class="card">
+        <div style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Gross Cash Sales</div>
+        <div style="font-family:var(--font-mono); font-size:1.6rem; font-weight:800; color:#ffffff; margin-top:0.25rem;">$${state.drawerSession.cashSalesUSD.toFixed(2)}</div>
+        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">14 Cash Transactions</div>
+      </div>
+      <div class="card">
+        <div style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Safe Drops & Payouts</div>
+        <div style="font-family:var(--font-mono); font-size:1.6rem; font-weight:800; color:#f87171; margin-top:0.25rem;">-$${(state.drawerSession.cashDropsUSD + state.drawerSession.payOutsUSD).toFixed(2)}</div>
+        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.25rem;">1 Safe Drop, 1 Payout</div>
+      </div>
+      <div class="card" style="border-color:rgba(59, 130, 246, 0.4);">
+        <div style="font-size:0.75rem; font-weight:700; color:var(--accent-blue); text-transform:uppercase;">Expected in Drawer</div>
+        <div style="font-family:var(--font-mono); font-size:1.6rem; font-weight:800; color:#ffffff; margin-top:0.25rem;">$${state.drawerSession.expectedCashUSD.toFixed(2)}</div>
+        <div style="font-size:0.75rem; color:var(--accent-blue); margin-top:0.25rem;">Session: OPEN</div>
+      </div>
+    </div>
+
+    <!-- Shift Cash Activity Ledger -->
+    <div class="card">
+      <h3 style="font-size:1.1rem; font-weight:800; margin-bottom:1rem;">Shift Drawer Activity Ledger</h3>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Activity Type</th>
+              <th>Amount ($)</th>
+              <th>Witness / Authorizer</th>
+              <th>Notes / Envelope ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>08:00 AM</td>
+              <td><span class="badge badge-online">OPENING BANK FLOAT</span></td>
+              <td><strong>+$200.00</strong></td>
+              <td>Sarah Jenkins (Cashier)</td>
+              <td>Initial float bank verified</td>
+            </tr>
+            <tr>
+              <td>01:15 PM</td>
+              <td><span class="badge badge-warning">MID-SHIFT SAFE DROP</span></td>
+              <td><strong>-$100.00</strong></td>
+              <td>Michael Smith (Manager)</td>
+              <td>Envelope #ENV-9914 dropped to safe</td>
+            </tr>
+            <tr>
+              <td>02:30 PM</td>
+              <td><span class="badge badge-danger">PETTY CASH PAYOUT</span></td>
+              <td><strong>-$20.00</strong></td>
+              <td>Michael Smith (Manager)</td>
+              <td>Window Cleaning Service Expense</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// 4. INVENTORY & PREP
 function renderInventoryPrepWorkspace() {
   return `
     <div class="section-header">
       <div>
-        <h2 class="section-title">Inventory, Prep & Spoilage</h2>
-        <p class="section-subtitle">Gram-Level Recipe Depletion &bull; Trim Shrinkage &bull; Par Level Guidance</p>
+        <h2 class="section-title">Inventory, Prep & Variance Tracking</h2>
+        <p class="section-subtitle">Gram-Level Recipe Depletion &bull; Yield Shrinkage &bull; Par Level Guidance</p>
       </div>
       <div class="header-actions">
         <button class="btn-primary" onclick="openModal('log_spoilage')">Log Kitchen Waste</button>
@@ -291,8 +480,8 @@ function renderInventoryPrepWorkspace() {
     </div>
 
     <!-- Inventory Variance Table -->
-    <div class="card" style="margin-bottom:2rem;">
-      <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:1rem;">Theoretical vs. Actual Variance Tracking</h3>
+    <div class="card" style="margin-bottom:1.5rem;">
+      <h3 style="font-size:1.1rem; font-weight:800; margin-bottom:1rem;">Theoretical vs. Actual Variance Tracking (&plusmn;2% Alert Threshold)</h3>
       <div class="table-container">
         <table class="data-table">
           <thead>
@@ -301,7 +490,7 @@ function renderInventoryPrepWorkspace() {
               <th>Theoretical Use</th>
               <th>Actual Count</th>
               <th>Unit</th>
-              <th>Variance</th>
+              <th>Variance Meter</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -312,7 +501,12 @@ function renderInventoryPrepWorkspace() {
                 <td>${v.theoretical}</td>
                 <td>${v.actual}</td>
                 <td>${v.unit}</td>
-                <td style="color:${v.alert ? '#f87171' : '#34d399'}; font-weight:700;">${v.variancePct}</td>
+                <td>
+                  <span class="variance-bar-bg">
+                    <span class="variance-bar-fill" style="width:${Math.min(100, v.variancePct * 7)}%; background:${v.alert ? '#f43f5e' : '#10b981'};"></span>
+                  </span>
+                  <strong style="color:${v.alert ? '#f87171' : '#34d399'}; font-family:var(--font-mono);">${v.variancePct > 0 ? '+' : ''}${v.variancePct}%</strong>
+                </td>
                 <td><span class="badge ${v.alert ? 'badge-danger' : 'badge-online'}">${v.alert ? 'VARIANCE ALERT' : 'IN RANGE'}</span></td>
               </tr>
             `).join('')}
@@ -323,7 +517,7 @@ function renderInventoryPrepWorkspace() {
 
     <!-- Spoilage Logs -->
     <div class="card">
-      <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:1rem;">Shift Spoilage & Waste Log</h3>
+      <h3 style="font-size:1.1rem; font-weight:800; margin-bottom:1rem;">Shift Spoilage & Waste Log</h3>
       <div class="table-container">
         <table class="data-table">
           <thead>
@@ -340,10 +534,10 @@ function renderInventoryPrepWorkspace() {
             ${state.spoilageLogs.map(s => `
               <tr>
                 <td><code>${s.id}</code></td>
-                <td>${s.item}</td>
+                <td><strong>${s.item}</strong></td>
                 <td>${s.qty}</td>
                 <td><span class="badge badge-danger">${s.reason}</span></td>
-                <td><strong>${s.cost}</strong></td>
+                <td style="font-family:var(--font-mono); font-weight:700;">${s.cost}</td>
                 <td>${s.loggedBy}</td>
               </tr>
             `).join('')}
@@ -354,25 +548,22 @@ function renderInventoryPrepWorkspace() {
   `;
 }
 
-// 4. LABOR & SHIFTS
+// 5. LABOR & SHIFTS
 function renderLaborShiftsWorkspace() {
   return `
     <div class="section-header">
       <div>
         <h2 class="section-title">Labor & Shift Scheduling</h2>
-        <p class="section-subtitle">FLSA Tip Pooling Compliance &bull; Fair Workweek Rest Guardrails &bull; California Daily OT</p>
+        <p class="section-subtitle">FLSA §3(m) Tip Pool Compliance &bull; Fair Workweek Rest Guardrails &bull; California Daily OT</p>
       </div>
       <div class="header-actions">
-        <button class="btn-primary" onclick="openModal('add_shift')">Schedule Shift</button>
-        <button class="btn-primary btn-purple" onclick="runAILaborOptimizer()">Run Labor Optimizer (Target 22%)</button>
+        <span class="badge badge-online">ACCRUED TIP POOL: $${state.tipPoolTotal.toFixed(2)}</span>
+        <button class="btn-primary btn-purple" onclick="alert('Labor schedule optimized for 22% target cost. Zero clopening violations detected.')">Run AI Optimizer</button>
       </div>
     </div>
 
-    <div class="card" style="margin-bottom:2rem;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-        <h3 style="font-size:1.1rem; font-weight:700;">Active Store Staff Roster</h3>
-        <span class="badge badge-online">TIP POOL ACCRUED: $${state.tipPoolTotal.toFixed(2)}</span>
-      </div>
+    <div class="card">
+      <h3 style="font-size:1.1rem; font-weight:800; margin-bottom:1rem;">Store Staff Shift Roster</h3>
       <div class="table-container">
         <table class="data-table">
           <thead>
@@ -395,7 +586,7 @@ function renderLaborShiftsWorkspace() {
                 <td>${e.shiftStart}</td>
                 <td>${e.hours} hrs</td>
                 <td><span class="badge badge-online">COMPLIANT</span></td>
-                <td>${e.role === 'Shift Lead' ? '<span style="color:#94a3b8;">Excluded (FLSA §3m)</span>' : '<span style="color:#34d399; font-weight:700;">Eligible</span>'}</td>
+                <td>${e.role === 'Shift Lead' ? '<span style="color:#94a3b8; font-size:0.8rem;">Banned (FLSA §3m)</span>' : '<span style="color:#34d399; font-weight:700;">Eligible Share</span>'}</td>
               </tr>
             `).join('')}
           </tbody>
@@ -405,22 +596,21 @@ function renderLaborShiftsWorkspace() {
   `;
 }
 
-// 5. MENU CATALOG
+// 6. MENU CATALOG
 function renderMenuCatalogWorkspace() {
   return `
     <div class="section-header">
       <div>
-        <h2 class="section-title">Menu Catalog & Brand-Lock Control</h2>
+        <h2 class="section-title">Menu Catalog & Brand-Lock Governance</h2>
         <p class="section-subtitle">Hierarchy: Platform &rarr; Brand &rarr; Region &rarr; Store &bull; Automatic Sync</p>
       </div>
       <div class="header-actions">
-        <button class="btn-primary" onclick="openModal('add_menu_item')">Add Menu Item</button>
-        <button class="btn-primary btn-purple" onclick="increaseCanaryRollout()">Advance Rollout (${state.canaryRolloutPct}%)</button>
+        <button class="btn-primary" onclick="openModal('add_menu_item')">Add Master Menu Item</button>
       </div>
     </div>
 
     <div class="card">
-      <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:1rem;">Master Menu Catalog</h3>
+      <h3 style="font-size:1.1rem; font-weight:800; margin-bottom:1rem;">Master Menu Catalog</h3>
       <div class="table-container">
         <table class="data-table">
           <thead>
@@ -430,7 +620,7 @@ function renderMenuCatalogWorkspace() {
               <th>Category</th>
               <th>Base Price</th>
               <th>Allergens</th>
-              <th>Brand Lock</th>
+              <th>Brand Lock Policy</th>
             </tr>
           </thead>
           <tbody>
@@ -439,9 +629,9 @@ function renderMenuCatalogWorkspace() {
                 <td><code>${item.sku}</code></td>
                 <td><strong>${item.name}</strong></td>
                 <td>${item.category}</td>
-                <td>$${item.basePrice.toFixed(2)}</td>
+                <td style="font-family:var(--font-mono); font-weight:700;">$${item.basePrice.toFixed(2)}</td>
                 <td>${item.allergens.join(', ') || 'None'}</td>
-                <td><span class="badge ${item.isBrandLocked ? 'badge-locked' : 'badge-online'}">${item.isBrandLocked ? 'BRAND LOCKED' : 'STORE OVERRIDABLE'}</span></td>
+                <td><span class="badge ${item.isBrandLocked ? 'badge-locked' : 'badge-online'}">${item.isBrandLocked ? 'HQ BRAND LOCKED' : 'STORE OVERRIDABLE'}</span></td>
               </tr>
             `).join('')}
           </tbody>
@@ -451,28 +641,28 @@ function renderMenuCatalogWorkspace() {
   `;
 }
 
-// 6. FINANCIALS & GL
+// 7. FINANCIALS & GL
 function renderFinancialsWorkspace() {
   return `
     <div class="section-header">
       <div>
-        <h2 class="section-title">Financial Accounting & General Ledger</h2>
-        <p class="section-subtitle">NetSuite Double-Entry GL &bull; Franchise Royalty ACH Drafts &bull; ADP Payroll</p>
+        <h2 class="section-title">Financial Accounting & NetSuite GL</h2>
+        <p class="section-subtitle">Balanced Double-Entry Journal Vouchers (Debits === Credits) &bull; Franchise Royalty ACH</p>
       </div>
       <div class="header-actions">
-        <button class="btn-primary" onclick="generateNetSuiteGLVoucher()">Export NetSuite GL Journal</button>
-        <button class="btn-primary btn-purple" onclick="generateRoyaltyInvoice()">Generate Franchise Royalty ACH</button>
+        <button class="btn-primary" onclick="alert('NetSuite GL Exported: Debits $3,010.00 === Credits $3,010.00 (Balanced).')">Export NetSuite Journal</button>
+        <button class="btn-primary btn-purple" onclick="alert('Franchise Royalty ACH Draft generated: $162.34 based on Net Sales.')">Generate Royalty ACH</button>
       </div>
     </div>
 
-    <div class="card" style="margin-bottom:2rem;">
-      <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:1rem;">NetSuite General Ledger Accounts (Debits === Credits)</h3>
+    <div class="card">
+      <h3 style="font-size:1.1rem; font-weight:800; margin-bottom:1rem;">NetSuite General Ledger Accounts (Debits === Credits Guarantee)</h3>
       <div class="table-container">
         <table class="data-table">
           <thead>
             <tr>
-              <th>Account</th>
-              <th>Description</th>
+              <th>Account #</th>
+              <th>Account Description</th>
               <th>Debit ($)</th>
               <th>Credit ($)</th>
               <th>Status</th>
@@ -481,22 +671,22 @@ function renderFinancialsWorkspace() {
           <tbody>
             <tr>
               <td><code>1010</code></td>
-              <td>Cash on Hand (Store Safe Float + Drawer)</td>
-              <td><strong>$550.00</strong></td>
+              <td>Cash on Hand (Store Float + Cash Receipts)</td>
+              <td style="font-family:var(--font-mono); font-weight:700;">$550.00</td>
               <td>$0.00</td>
               <td><span class="badge badge-online">BALANCED</span></td>
             </tr>
             <tr>
               <td><code>1020</code></td>
               <td>Merchant Card Settlement Clearing</td>
-              <td><strong>$1,840.00</strong></td>
+              <td style="font-family:var(--font-mono); font-weight:700;">$1,840.00</td>
               <td>$0.00</td>
               <td><span class="badge badge-online">BALANCED</span></td>
             </tr>
             <tr>
               <td><code>1030</code></td>
               <td>3rd-Party Delivery AR (DoorDash / UberEats)</td>
-              <td><strong>$620.00</strong></td>
+              <td style="font-family:var(--font-mono); font-weight:700;">$620.00</td>
               <td>$0.00</td>
               <td><span class="badge badge-online">BALANCED</span></td>
             </tr>
@@ -504,68 +694,23 @@ function renderFinancialsWorkspace() {
               <td><code>2010</code></td>
               <td>Sales Tax Payable</td>
               <td>$0.00</td>
-              <td><strong>$240.80</strong></td>
+              <td style="font-family:var(--font-mono); font-weight:700;">$240.80</td>
               <td><span class="badge badge-online">BALANCED</span></td>
             </tr>
             <tr>
               <td><code>2020</code></td>
               <td>Accrued Tip Liability (Owed to Staff)</td>
               <td>$0.00</td>
-              <td><strong>$450.00</strong></td>
+              <td style="font-family:var(--font-mono); font-weight:700;">$450.00</td>
               <td><span class="badge badge-online">BALANCED</span></td>
             </tr>
             <tr>
               <td><code>4010</code></td>
               <td>Food & Beverage Sales Revenue</td>
               <td>$0.00</td>
-              <td><strong>$2,319.20</strong></td>
+              <td style="font-family:var(--font-mono); font-weight:700;">$2,319.20</td>
               <td><span class="badge badge-online">BALANCED</span></td>
             </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-}
-
-// 7. FRANCHISE OVERVIEW
-function renderFranchiseOverviewWorkspace() {
-  return `
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">Franchise Portal & Store Audit Logs</h2>
-        <p class="section-subtitle">Multi-Store Ownership Overview &bull; Store Audit Trail &bull; Performance</p>
-      </div>
-      <div class="header-actions">
-        <button class="btn-primary" onclick="alert('Store performance report exported.')">Export Monthly P&L</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h3 style="font-size:1.1rem; font-weight:700; margin-bottom:1rem;">Cryptographic Audit Ledger</h3>
-      <div class="table-container">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Log ID</th>
-              <th>Timestamp</th>
-              <th>Actor</th>
-              <th>Action</th>
-              <th>Target</th>
-              <th>SHA-256 Hash</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${state.auditLedger.map(a => `
-              <tr>
-                <td><code>${a.id}</code></td>
-                <td>${a.timestamp}</td>
-                <td><strong>${a.actor}</strong></td>
-                <td><span class="badge badge-online">${a.action}</span></td>
-                <td>${a.target}</td>
-                <td><code style="font-size:0.75rem;">${a.hash.slice(0, 16)}...</code></td>
-              </tr>
-            `).join('')}
           </tbody>
         </table>
       </div>
@@ -579,16 +724,47 @@ window.selectModule = function(mod) {
   renderApp();
 };
 
-window.addToCart = function(id) {
+window.setCategory = function(cat) {
+  state.activeCategory = cat;
+  renderApp();
+};
+
+window.setKDSStation = function(station) {
+  state.activeKDSStation = station;
+  renderApp();
+};
+
+window.openModifierModal = function(id) {
   const item = state.menuItems.find(m => m.id === id);
   if (!item) return;
-  const existing = state.cart.find(c => c.id === id);
-  if (existing) {
-    existing.qty++;
+  state.selectedModifierItem = item;
+  state.activeModifiers = [];
+  openModal('item_modifiers');
+};
+
+window.toggleModifierOption = function(modName, price) {
+  const existingIdx = state.activeModifiers.findIndex(m => m.name === modName);
+  if (existingIdx >= 0) {
+    state.activeModifiers.splice(existingIdx, 1);
   } else {
-    state.cart.push({ ...item, qty: 1 });
+    state.activeModifiers.push({ name: modName, price });
   }
   renderApp();
+};
+
+window.addCustomizedItemToCart = function() {
+  if (!state.selectedModifierItem) return;
+  const modCost = state.activeModifiers.reduce((sum, m) => sum + m.price, 0);
+  const modNames = state.activeModifiers.map(m => m.name);
+
+  state.cart.push({
+    ...state.selectedModifierItem,
+    qty: 1,
+    modifiersCost: modCost,
+    modifiers: modNames,
+  });
+
+  closeModal();
 };
 
 window.updateCartQty = function(idx, delta) {
@@ -599,8 +775,22 @@ window.updateCartQty = function(idx, delta) {
   renderApp();
 };
 
+window.clearCart = function() {
+  state.cart = [];
+  renderApp();
+};
+
+window.quickCashCheckout = function(tenderAmount) {
+  const subtotal = state.cart.reduce((sum, item) => sum + (item.basePrice + (item.modifiersCost || 0)) * item.qty, 0);
+  const total = subtotal * 1.08;
+  const changeDue = Math.max(0, tenderAmount - total);
+  
+  checkoutOrder('CASH');
+  alert(`Cash Tendered: $${tenderAmount.toFixed(2)}\nTotal Due: $${total.toFixed(2)}\n----------------------\nChange Due: $${changeDue.toFixed(2)}`);
+};
+
 window.checkoutOrder = async function(tenderType) {
-  const subtotal = state.cart.reduce((sum, item) => sum + item.basePrice * item.qty, 0);
+  const subtotal = state.cart.reduce((sum, item) => sum + (item.basePrice + (item.modifiersCost || 0)) * item.qty, 0);
   const tax = subtotal * 0.08;
   const total = subtotal + tax;
 
@@ -609,7 +799,11 @@ window.checkoutOrder = async function(tenderType) {
     storeId: 'store-104',
     terminalId: 'pos-1',
     timestamp: new Date().toISOString(),
-    items: state.cart.map(i => ({ menuItemId: i.id, quantity: i.qty, unitPrice: i.basePrice })),
+    items: state.cart.map(i => ({ 
+      menuItemId: i.id, 
+      quantity: i.qty, 
+      unitPrice: i.basePrice + (i.modifiersCost || 0) 
+    })),
     subtotal: Number(subtotal.toFixed(2)),
     tax: Number(tax.toFixed(2)),
     total: Number(total.toFixed(2)),
@@ -627,7 +821,13 @@ window.checkoutOrder = async function(tenderType) {
     const data = await res.json();
     alert(`Order ${payload.id} checkout complete via ${tenderType}.\nStored in local SQLite WAL: ${data.sqliteWalPersisted ? 'YES' : 'NO'}`);
   } catch (err) {
-    alert(`Checkout complete in local fallback mode.\nTx ID: ${payload.id}`);
+    alert(`Checkout complete in offline edge mode.\nTx ID: ${payload.id}`);
+  }
+
+  // Update in-memory drawer if cash
+  if (tenderType === 'CASH') {
+    state.drawerSession.cashSalesUSD += total;
+    state.drawerSession.expectedCashUSD += total;
   }
 
   state.cart = [];
@@ -639,24 +839,8 @@ window.bumpKDSTicket = function(idx) {
   renderApp();
 };
 
-window.testPrintESCPOSTicket = async function() {
-  alert('Dispatched raw ESC/POS binary ticket to Kitchen Hotline (Port 9100) with fallback station failover active.');
-};
-
-window.printStationTicket = function(ticketId) {
-  alert(`Ticket #${ticketId} dispatched to printer.`);
-};
-
-window.runAILaborOptimizer = function() {
-  alert('Labor schedule optimized for 22% target cost. Zero clopening violations detected.');
-};
-
-window.generateNetSuiteGLVoucher = function() {
-  alert('NetSuite GL Daily Journal generated: Debits $3,010.00 === Credits $3,010.00 (Balanced).');
-};
-
-window.generateRoyaltyInvoice = function() {
-  alert('Royalty Invoice generated on Net Sales ($2,319.20): Royalty Fee $115.96 + Marketing Fund $46.38 = $162.34 ACH Draft.');
+window.testPrintESCPOSTicket = function() {
+  alert('Dispatched raw ESC/POS binary ticket to Hotline Printer (Port 9100) with automatic station failover active.');
 };
 
 window.toggleOffline = function() {
@@ -671,16 +855,141 @@ window.openModal = function(m) {
 
 window.closeModal = function() {
   state.modalOpen = null;
-  renderApp();
-};
-
-window.increaseCanaryRollout = function() {
-  state.canaryRolloutPct = Math.min(100, state.canaryRolloutPct + 25);
+  state.selectedModifierItem = null;
   renderApp();
 };
 
 function renderModals() {
   if (!state.modalOpen) return '';
+
+  if (state.modalOpen === 'item_modifiers' && state.selectedModifierItem) {
+    const item = state.selectedModifierItem;
+    return `
+      <div class="modal-overlay" onclick="closeModal()">
+        <div class="modal-card" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <div>
+              <h3 style="font-size:1.15rem; font-weight:800;">Customize ${item.name}</h3>
+              <span style="font-size:0.8rem; color:var(--text-muted);">$${item.basePrice.toFixed(2)} base</span>
+            </div>
+            <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:1rem; margin-bottom:1.5rem;">
+            <div>
+              <div style="font-size:0.75rem; font-weight:800; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.5rem;">Extra Toppings & Mods</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+                <button class="btn-primary btn-slate" style="justify-content:space-between;" onclick="toggleModifierOption('+ Extra Cheese', 2.00)">
+                  <span>+ Extra Cheese</span>
+                  <span>+$2.00</span>
+                </button>
+                <button class="btn-primary btn-slate" style="justify-content:space-between;" onclick="toggleModifierOption('+ Pepperoni', 2.50)">
+                  <span>+ Pepperoni</span>
+                  <span>+$2.50</span>
+                </button>
+                <button class="btn-primary btn-slate" style="justify-content:space-between;" onclick="toggleModifierOption('+ Mushrooms', 1.50)">
+                  <span>+ Mushrooms</span>
+                  <span>+$1.50</span>
+                </button>
+                <button class="btn-primary btn-slate" style="justify-content:space-between;" onclick="toggleModifierOption('Well Done', 0.00)">
+                  <span>Well Done</span>
+                  <span>Free</span>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div style="font-size:0.75rem; font-weight:800; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.5rem;">Exclusions</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+                <button class="btn-primary btn-slate" onclick="toggleModifierOption('NO Onion', 0.00)">NO Onion</button>
+                <button class="btn-primary btn-slate" onclick="toggleModifierOption('NO Dairy (Vegan)', 0.00)">NO Dairy</button>
+              </div>
+            </div>
+
+            ${state.activeModifiers.length > 0 ? `
+              <div style="background:var(--bg-card); padding:0.75rem; border-radius:var(--radius-md); border:1px solid var(--border-subtle);">
+                <div style="font-size:0.75rem; color:var(--text-muted);">Selected Modifiers:</div>
+                <div style="color:var(--accent-amber); font-weight:700; font-size:0.85rem; margin-top:0.25rem;">
+                  ${state.activeModifiers.map(m => m.name).join(', ')}
+                </div>
+              </div>
+            ` : ''}
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
+            <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
+            <button type="button" class="btn-primary btn-emerald" onclick="addCustomizedItemToCart()">Add to Ticket</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  if (state.modalOpen === 'blind_z_report') {
+    return `
+      <div class="modal-overlay" onclick="closeModal()">
+        <div class="modal-card" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <div>
+              <h3 style="font-size:1.15rem; font-weight:800;">Blind End-of-Day Z-Report</h3>
+              <span style="font-size:0.8rem; color:var(--text-muted);">Terminal 01 &bull; Cashier Blind Count</span>
+            </div>
+            <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+          </div>
+
+          <div style="background:rgba(245, 158, 11, 0.1); border:1px solid rgba(245, 158, 11, 0.3); padding:0.75rem; border-radius:var(--radius-md); margin-bottom:1rem; font-size:0.82rem; color:#fbbf24;">
+            <strong>Blind Reconciliation Policy:</strong> Expected drawer cash is hidden to prevent theft skimming. Count all physical currency and enter total below.
+          </div>
+
+          <form onsubmit="event.preventDefault(); alert('Z-Report submitted. Actual: $430.00, Expected: $430.00. Variance: $0.00 (Balanced).'); closeModal();">
+            <div class="form-group">
+              <label>Actual Cash Counted ($ USD)</label>
+              <input type="number" step="0.01" class="form-control" placeholder="0.00" value="430.00" style="font-family:var(--font-mono); font-size:1.3rem; font-weight:800;" required />
+            </div>
+            <div class="form-group">
+              <label>Manager Authorization Signature Token</label>
+              <input type="password" class="form-control" value="mgr-pin-token-991" required />
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.5rem;">
+              <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
+              <button type="submit" class="btn-primary btn-emerald">Reconcile & Close Drawer</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+  }
+
+  if (state.modalOpen === 'cash_drop') {
+    return `
+      <div class="modal-overlay" onclick="closeModal()">
+        <div class="modal-card" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <h3>Record Mid-Shift Safe Drop</h3>
+            <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+          </div>
+          <form onsubmit="event.preventDefault(); alert('Safe Drop of $100.00 logged to Envelope #ENV-9915.'); closeModal();">
+            <div class="form-group">
+              <label>Drop Amount ($ USD)</label>
+              <input type="number" step="0.01" class="form-control" value="100.00" required />
+            </div>
+            <div class="form-group">
+              <label>Safe Drop Envelope ID</label>
+              <input type="text" class="form-control" value="ENV-9915" required />
+            </div>
+            <div class="form-group">
+              <label>Witness Manager ID</label>
+              <input type="text" class="form-control" value="mgr-michael-smith" required />
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.5rem;">
+              <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
+              <button type="submit" class="btn-primary btn-amber">Confirm Safe Drop</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+  }
 
   if (state.modalOpen === 'log_spoilage') {
     return `
@@ -690,13 +999,13 @@ function renderModals() {
             <h3>Log Kitchen Waste / Spoilage</h3>
             <button class="modal-close-btn" onclick="closeModal()">&times;</button>
           </div>
-          <form onsubmit="event.preventDefault(); alert('Waste logged.'); closeModal();">
+          <form onsubmit="event.preventDefault(); alert('Kitchen waste logged.'); closeModal();">
             <div class="form-group">
               <label>Item Name</label>
               <input type="text" class="form-control" value="Mozzarella Cheese (Shredded)" required />
             </div>
             <div class="form-group">
-              <label>Quantity Lost (kg / pcs)</label>
+              <label>Quantity Lost</label>
               <input type="text" class="form-control" value="1.5 kg" required />
             </div>
             <div class="form-group">
@@ -708,8 +1017,8 @@ function renderModals() {
               </select>
             </div>
             <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.5rem;">
-              <button type="button" class="btn-primary" style="background:#475569;" onclick="closeModal()">Cancel</button>
-              <button type="submit" class="btn-primary btn-danger">Confirm Waste Log</button>
+              <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
+              <button type="submit" class="btn-primary btn-rose">Confirm Waste Log</button>
             </div>
           </form>
         </div>
@@ -722,10 +1031,10 @@ function renderModals() {
       <div class="modal-overlay" onclick="closeModal()">
         <div class="modal-card" onclick="event.stopPropagation()">
           <div class="modal-header">
-            <h3>Add Menu Item</h3>
+            <h3>Add Master Menu Item</h3>
             <button class="modal-close-btn" onclick="closeModal()">&times;</button>
           </div>
-          <form onsubmit="event.preventDefault(); alert('Menu item added.'); closeModal();">
+          <form onsubmit="event.preventDefault(); alert('Menu item added to catalog.'); closeModal();">
             <div class="form-group">
               <label>Item Name</label>
               <input type="text" class="form-control" placeholder="e.g. Truffle Mushroom Flatbread" required />
@@ -739,7 +1048,7 @@ function renderModals() {
               <input type="number" step="0.01" class="form-control" placeholder="17.99" required />
             </div>
             <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.5rem;">
-              <button type="button" class="btn-primary" style="background:#475569;" onclick="closeModal()">Cancel</button>
+              <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
               <button type="submit" class="btn-primary">Save to Catalog</button>
             </div>
           </form>
