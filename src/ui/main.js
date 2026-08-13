@@ -1100,10 +1100,10 @@ function renderModals() {
         <div class="modal-card" onclick="event.stopPropagation()">
           <div class="modal-header">
             <div>
-              <h3 style="font-size:1.15rem; font-weight:800;">Seat ${table.label} (${table.seats} Seats)</h3>
-              <span style="font-size:0.8rem; color:var(--text-muted);">${table.section}</span>
+              <div class="modal-title">Seat ${table.label} (${table.seats} Seats)</div>
+              <div class="modal-subtitle">${table.section} &bull; Open Table Ticket</div>
             </div>
-            <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+            <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
           </div>
 
           <form onsubmit="
@@ -1122,10 +1122,10 @@ function renderModals() {
               <input type="number" id="seatCoversInput" class="form-control" min="1" max="${table.seats}" value="2" required />
             </div>
             <div class="form-group">
-              <label>Assigned Server</label>
+              <label>Assigned Server Name</label>
               <input type="text" id="serverNameInput" class="form-control" value="Sarah Jenkins" required />
             </div>
-            <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.5rem;">
+            <div style="display:flex; justify-content:flex-end; gap:0.65rem; margin-top:1.75rem;">
               <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
               <button type="submit" class="btn-primary btn-emerald">Open Table Ticket</button>
             </div>
@@ -1141,10 +1141,10 @@ function renderModals() {
         <div class="modal-card" onclick="event.stopPropagation()">
           <div class="modal-header">
             <div>
-              <h3 style="font-size:1.15rem; font-weight:800;">Create Purchase Order (PO)</h3>
-              <span style="font-size:0.8rem; color:var(--text-muted);">Supplier Order Requisition</span>
+              <div class="modal-title">Create Purchase Order (PO)</div>
+              <div class="modal-subtitle">Wholesale Supplier Order Requisition</div>
             </div>
-            <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+            <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
           </div>
 
           <form onsubmit="
@@ -1177,7 +1177,7 @@ function renderModals() {
               <label>Expected Delivery Date</label>
               <input type="date" class="form-control" value="2026-08-20" required />
             </div>
-            <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.5rem;">
+            <div style="display:flex; justify-content:flex-end; gap:0.65rem; margin-top:1.75rem;">
               <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
               <button type="submit" class="btn-primary btn-emerald">Dispatch PO</button>
             </div>
@@ -1194,10 +1194,10 @@ function renderModals() {
         <div class="modal-card" onclick="event.stopPropagation()">
           <div class="modal-header">
             <div>
-              <h3 style="font-size:1.15rem; font-weight:800;">Receive GRN for ${po.poId}</h3>
-              <span style="font-size:0.8rem; color:var(--text-muted);">${po.supplierName}</span>
+              <div class="modal-title">Receive GRN for ${po.poId}</div>
+              <div class="modal-subtitle">${po.supplierName} &bull; Store Delivery Requisition</div>
             </div>
-            <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+            <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
           </div>
 
           <form onsubmit="
@@ -1210,13 +1210,13 @@ function renderModals() {
           ">
             <div class="form-group">
               <label>Received Mozzarella Cheese (kg)</label>
-              <input type="number" step="0.1" class="form-control" value="20.0" required />
+              <input type="number" step="0.1" class="form-control" value="20.0" style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800;" required />
             </div>
             <div class="form-group">
               <label>Receiving Staff Member</label>
               <input type="text" class="form-control" value="Warehouse Staff Lead" required />
             </div>
-            <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.5rem;">
+            <div style="display:flex; justify-content:flex-end; gap:0.65rem; margin-top:1.75rem;">
               <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
               <button type="submit" class="btn-primary btn-emerald">Post GRN & Increment Stock</button>
             </div>
@@ -1232,10 +1232,10 @@ function renderModals() {
         <div class="modal-card" onclick="event.stopPropagation()">
           <div class="modal-header">
             <div>
-              <h3 style="font-size:1.15rem; font-weight:800;">Blind Physical Stock-Take</h3>
-              <span style="font-size:0.8rem; color:var(--text-muted);">Reconciliation against running balance</span>
+              <div class="modal-title">Blind Physical Stock-Take</div>
+              <div class="modal-subtitle">Reconciliation against theoretical running balance</div>
             </div>
-            <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+            <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
           </div>
 
           <form onsubmit="
@@ -1245,17 +1245,17 @@ function renderModals() {
           ">
             <div class="form-group">
               <label>Mozzarella Cheese Physical Count (kg)</label>
-              <input type="number" step="0.1" class="form-control" value="16.3" required />
+              <input type="number" step="0.1" class="form-control" value="16.3" style="font-family:var(--font-mono);" required />
             </div>
             <div class="form-group">
               <label>Pepperoni Physical Count (kg)</label>
-              <input type="number" step="0.1" class="form-control" value="8.6" required />
+              <input type="number" step="0.1" class="form-control" value="8.6" style="font-family:var(--font-mono);" required />
             </div>
             <div class="form-group">
               <label>Flour Physical Count (kg)</label>
-              <input type="number" step="0.1" class="form-control" value="48.0" required />
+              <input type="number" step="0.1" class="form-control" value="48.0" style="font-family:var(--font-mono);" required />
             </div>
-            <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.5rem;">
+            <div style="display:flex; justify-content:flex-end; gap:0.65rem; margin-top:1.75rem;">
               <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
               <button type="submit" class="btn-primary btn-emerald">Compute Variances</button>
             </div>
@@ -1272,54 +1272,54 @@ function renderModals() {
         <div class="modal-card" onclick="event.stopPropagation()">
           <div class="modal-header">
             <div>
-              <h3 style="font-size:1.15rem; font-weight:800;">Customize ${item.name}</h3>
-              <span style="font-size:0.8rem; color:var(--text-muted);">$${item.basePrice.toFixed(2)} base</span>
+              <div class="modal-title">Customize ${item.name}</div>
+              <div class="modal-subtitle">$${item.basePrice.toFixed(2)} base price</div>
             </div>
-            <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+            <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
           </div>
 
-          <div style="display:flex; flex-direction:column; gap:1rem; margin-bottom:1.5rem;">
+          <div style="display:flex; flex-direction:column; gap:1.2rem; margin-bottom:1.5rem;">
             <div>
-              <div style="font-size:0.75rem; font-weight:800; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.5rem;">Extra Toppings & Mods</div>
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+              <div style="font-size:0.8rem; font-weight:800; color:#cbd5e1; text-transform:uppercase; margin-bottom:0.6rem;">Extra Toppings & Mods</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.6rem;">
                 <button class="btn-primary btn-slate" style="justify-content:space-between;" onclick="toggleModifierOption('+ Extra Cheese', 2.00)">
                   <span>+ Extra Cheese</span>
-                  <span>+$2.00</span>
+                  <span style="color:#34d399; font-weight:800;">+$2.00</span>
                 </button>
                 <button class="btn-primary btn-slate" style="justify-content:space-between;" onclick="toggleModifierOption('+ Pepperoni', 2.50)">
                   <span>+ Pepperoni</span>
-                  <span>+$2.50</span>
+                  <span style="color:#34d399; font-weight:800;">+$2.50</span>
                 </button>
                 <button class="btn-primary btn-slate" style="justify-content:space-between;" onclick="toggleModifierOption('+ Mushrooms', 1.50)">
                   <span>+ Mushrooms</span>
-                  <span>+$1.50</span>
+                  <span style="color:#34d399; font-weight:800;">+$1.50</span>
                 </button>
                 <button class="btn-primary btn-slate" style="justify-content:space-between;" onclick="toggleModifierOption('Well Done', 0.00)">
                   <span>Well Done</span>
-                  <span>Free</span>
+                  <span style="color:var(--text-muted);">Free</span>
                 </button>
               </div>
             </div>
 
             <div>
-              <div style="font-size:0.75rem; font-weight:800; color:var(--text-muted); text-transform:uppercase; margin-bottom:0.5rem;">Exclusions</div>
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+              <div style="font-size:0.8rem; font-weight:800; color:#cbd5e1; text-transform:uppercase; margin-bottom:0.6rem;">Exclusions</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.6rem;">
                 <button class="btn-primary btn-slate" onclick="toggleModifierOption('NO Onion', 0.00)">NO Onion</button>
                 <button class="btn-primary btn-slate" onclick="toggleModifierOption('NO Dairy (Vegan)', 0.00)">NO Dairy</button>
               </div>
             </div>
 
             ${state.activeModifiers.length > 0 ? `
-              <div style="background:var(--bg-card); padding:0.75rem; border-radius:var(--radius-md); border:1px solid var(--border-subtle);">
-                <div style="font-size:0.75rem; color:var(--text-muted);">Selected Modifiers:</div>
-                <div style="color:var(--accent-amber); font-weight:700; font-size:0.85rem; margin-top:0.25rem;">
+              <div style="background:var(--bg-input); padding:0.85rem; border-radius:var(--radius-md); border:1.5px solid var(--accent-amber);">
+                <div style="font-size:0.78rem; font-weight:700; color:var(--text-muted);">Selected Modifiers:</div>
+                <div style="color:#fde68a; font-weight:800; font-size:0.95rem; margin-top:0.25rem;">
                   ${state.activeModifiers.map(m => m.name).join(', ')}
                 </div>
               </div>
             ` : ''}
           </div>
 
-          <div style="display:flex; justify-content:flex-end; gap:0.5rem;">
+          <div style="display:flex; justify-content:flex-end; gap:0.65rem;">
             <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
             <button type="button" class="btn-primary btn-emerald" onclick="addCustomizedItemToCart()">Add to Ticket</button>
           </div>
@@ -1334,26 +1334,26 @@ function renderModals() {
         <div class="modal-card" onclick="event.stopPropagation()">
           <div class="modal-header">
             <div>
-              <h3 style="font-size:1.15rem; font-weight:800;">Blind End-of-Day Z-Report</h3>
-              <span style="font-size:0.8rem; color:var(--text-muted);">Terminal 01 &bull; Cashier Blind Count</span>
+              <div class="modal-title">Blind End-of-Day Z-Report</div>
+              <div class="modal-subtitle">Terminal 01 &bull; Cashier Blind Count</div>
             </div>
-            <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+            <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
           </div>
 
-          <div style="background:rgba(245, 158, 11, 0.1); border:1px solid rgba(245, 158, 11, 0.3); padding:0.75rem; border-radius:var(--radius-md); margin-bottom:1rem; font-size:0.82rem; color:#fbbf24;">
+          <div style="background:#78350f; border:1px solid #f59e0b; padding:0.85rem; border-radius:var(--radius-md); margin-bottom:1.2rem; font-size:0.85rem; color:#fde68a;">
             <strong>Blind Reconciliation Policy:</strong> Expected drawer cash is hidden to prevent theft skimming. Count all physical currency and enter total below.
           </div>
 
           <form onsubmit="event.preventDefault(); alert('Z-Report submitted. Actual: $430.00, Expected: $430.00. Variance: $0.00 (Balanced).'); closeModal();">
             <div class="form-group">
               <label>Actual Cash Counted ($ USD)</label>
-              <input type="number" step="0.01" class="form-control" placeholder="0.00" value="430.00" style="font-family:var(--font-mono); font-size:1.3rem; font-weight:800;" required />
+              <input type="number" step="0.01" class="form-control" placeholder="0.00" value="430.00" style="font-family:var(--font-mono); font-size:1.35rem; font-weight:900;" required />
             </div>
             <div class="form-group">
               <label>Manager Authorization Signature Token</label>
               <input type="password" class="form-control" value="mgr-pin-token-991" required />
             </div>
-            <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.5rem;">
+            <div style="display:flex; justify-content:flex-end; gap:0.65rem; margin-top:1.75rem;">
               <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
               <button type="submit" class="btn-primary btn-emerald">Reconcile & Close Drawer</button>
             </div>
@@ -1368,13 +1368,16 @@ function renderModals() {
       <div class="modal-overlay" onclick="closeModal()">
         <div class="modal-card" onclick="event.stopPropagation()">
           <div class="modal-header">
-            <h3>Record Mid-Shift Safe Drop</h3>
-            <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+            <div>
+              <div class="modal-title">Record Mid-Shift Safe Drop</div>
+              <div class="modal-subtitle">Safe Drop Envelope & Witness Verification</div>
+            </div>
+            <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
           </div>
           <form onsubmit="event.preventDefault(); alert('Safe Drop of $100.00 logged to Envelope #ENV-9915.'); closeModal();">
             <div class="form-group">
               <label>Drop Amount ($ USD)</label>
-              <input type="number" step="0.01" class="form-control" value="100.00" required />
+              <input type="number" step="0.01" class="form-control" value="100.00" style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800;" required />
             </div>
             <div class="form-group">
               <label>Safe Drop Envelope ID</label>
@@ -1384,7 +1387,7 @@ function renderModals() {
               <label>Witness Manager ID</label>
               <input type="text" class="form-control" value="mgr-michael-smith" required />
             </div>
-            <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.5rem;">
+            <div style="display:flex; justify-content:flex-end; gap:0.65rem; margin-top:1.75rem;">
               <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
               <button type="submit" class="btn-primary btn-amber">Confirm Safe Drop</button>
             </div>
@@ -1399,8 +1402,11 @@ function renderModals() {
       <div class="modal-overlay" onclick="closeModal()">
         <div class="modal-card" onclick="event.stopPropagation()">
           <div class="modal-header">
-            <h3>Log Kitchen Waste / Spoilage</h3>
-            <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+            <div>
+              <div class="modal-title">Log Kitchen Waste / Spoilage</div>
+              <div class="modal-subtitle">Theoretical COGS Depletion & Loss Reason Tracking</div>
+            </div>
+            <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
           </div>
           <form onsubmit="event.preventDefault(); alert('Kitchen waste logged.'); closeModal();">
             <div class="form-group">
@@ -1419,7 +1425,7 @@ function renderModals() {
                 <option>EXPIRED</option>
               </select>
             </div>
-            <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.5rem;">
+            <div style="display:flex; justify-content:flex-end; gap:0.65rem; margin-top:1.75rem;">
               <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
               <button type="submit" class="btn-primary btn-rose">Confirm Waste Log</button>
             </div>
@@ -1434,8 +1440,11 @@ function renderModals() {
       <div class="modal-overlay" onclick="closeModal()">
         <div class="modal-card" onclick="event.stopPropagation()">
           <div class="modal-header">
-            <h3>Add Master Menu Item</h3>
-            <button class="modal-close-btn" onclick="closeModal()">&times;</button>
+            <div>
+              <div class="modal-title">Add Master Menu Item</div>
+              <div class="modal-subtitle">Master Menu Catalog Governance</div>
+            </div>
+            <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
           </div>
           <form onsubmit="event.preventDefault(); alert('Menu item added to catalog.'); closeModal();">
             <div class="form-group">
@@ -1448,9 +1457,9 @@ function renderModals() {
             </div>
             <div class="form-group">
               <label>Base Price ($)</label>
-              <input type="number" step="0.01" class="form-control" placeholder="17.99" required />
+              <input type="number" step="0.01" class="form-control" placeholder="17.99" style="font-family:var(--font-mono);" required />
             </div>
-            <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:1.5rem;">
+            <div style="display:flex; justify-content:flex-end; gap:0.65rem; margin-top:1.75rem;">
               <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
               <button type="submit" class="btn-primary">Save to Catalog</button>
             </div>
