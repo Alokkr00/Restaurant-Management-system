@@ -208,6 +208,9 @@ function renderApp() {
 
     <!-- Modals -->
     ${renderModals()}
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container"></div>
   `;
 }
 
@@ -753,7 +756,7 @@ function renderLaborShiftsWorkspace() {
       </div>
       <div class="header-actions">
         <span class="badge badge-online">ACCRUED TIP POOL: $${state.tipPoolTotal.toFixed(2)}</span>
-        <button class="btn-primary btn-purple" onclick="alert('Labor schedule optimized for 22% target cost. Zero clopening violations detected.')">Run AI Optimizer</button>
+        <button class="btn-primary btn-purple" onclick="showToast({ title: 'AI Labor Optimizer', message: 'Labor schedule optimized for 22% target cost. Zero clopening violations detected.', type: 'success' })">Run AI Optimizer</button>
       </div>
     </div>
 
@@ -845,8 +848,8 @@ function renderFinancialsWorkspace() {
         <p class="section-subtitle">Balanced Double-Entry Journal Vouchers (Debits === Credits) &bull; Franchise Royalty ACH</p>
       </div>
       <div class="header-actions">
-        <button class="btn-primary" onclick="alert('NetSuite GL Exported: Debits $3,010.00 === Credits $3,010.00 (Balanced).')">Export NetSuite Journal</button>
-        <button class="btn-primary btn-purple" onclick="alert('Franchise Royalty ACH Draft generated: $162.34 based on Net Sales.')">Generate Royalty ACH</button>
+        <button class="btn-primary" onclick="showToast({ title: 'NetSuite GL Exported', message: 'Balanced Journal Voucher generated: Debits $3,010.00 === Credits $3,010.00.', type: 'info' })">Export NetSuite Journal</button>
+        <button class="btn-primary btn-purple" onclick="showToast({ title: 'Franchise Royalty ACH', message: 'ACH Direct Debit Draft generated: $162.34 based on audited Net Sales.', type: 'info' })">Generate Royalty ACH</button>
       </div>
     </div>
 
@@ -913,6 +916,43 @@ function renderFinancialsWorkspace() {
   `;
 }
 
+// Global Toast System
+window.showToast = function({ title, message, type = 'success', duration = 3800 }) {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    document.body.appendChild(container);
+  }
+
+  const icon = type === 'success' ? '✓' : type === 'warning' ? '⚠️' : type === 'danger' ? '✕' : 'ℹ';
+  
+  const toast = document.createElement('div');
+  toast.className = `toast-notification toast-${type}`;
+  toast.innerHTML = `
+    <div class="toast-icon-box">${icon}</div>
+    <div class="toast-body">
+      <div class="toast-title">${title}</div>
+      ${message ? `<div class="toast-message">${message}</div>` : ''}
+    </div>
+    <button class="toast-close-btn">&times;</button>
+    <div class="toast-progress" style="animation-duration: ${duration}ms;"></div>
+  `;
+
+  container.appendChild(toast);
+
+  const timer = setTimeout(() => {
+    toast.classList.add('toast-hiding');
+    setTimeout(() => toast.remove(), 250);
+  }, duration);
+
+  toast.querySelector('.toast-close-btn').onclick = () => {
+    clearTimeout(timer);
+    toast.classList.add('toast-hiding');
+    setTimeout(() => toast.remove(), 250);
+  };
+};
+
 // Global actions
 window.selectModule = function(mod) {
   state.activeModule = mod;
@@ -948,7 +988,11 @@ window.fireCourseForTable = function(tableId) {
   const table = state.tables.find(t => t.tableId === tableId);
   if (!table) return;
   table.status = 'SERVED';
-  alert(`Course fired to KDS for ${table.label}. Kitchen station received ticket over LAN WebSocket.`);
+  showToast({ 
+    title: 'KDS Course Fired', 
+    message: `Active course for ${table.label} dispatched over LAN WebSocket to Hotline KDS.`, 
+    type: 'success' 
+  });
   renderApp();
 };
 
@@ -960,7 +1004,11 @@ window.closeTableCheckout = function(tableId) {
   delete table.covers;
   delete table.serverName;
   delete table.seatedAt;
-  alert(`${table.label} bill settled via Cash. Table reset to VACANT.`);
+  showToast({ 
+    title: 'Table Settled & Closed', 
+    message: `${table.label} bill settled via Cash. Table reset to VACANT.`, 
+    type: 'success' 
+  });
   renderApp();
 };
 
@@ -1015,7 +1063,11 @@ window.quickCashCheckout = function(tenderAmount) {
   const changeDue = Math.max(0, tenderAmount - total);
   
   checkoutOrder('CASH');
-  alert(`Cash Tendered: $${tenderAmount.toFixed(2)}\nTotal Due: $${total.toFixed(2)}\n----------------------\nChange Due: $${changeDue.toFixed(2)}`);
+  showToast({ 
+    title: 'Cash Payment Processed', 
+    message: `Tendered: $${tenderAmount.toFixed(2)} | Total: $${total.toFixed(2)}\nChange Due: $${changeDue.toFixed(2)}`, 
+    type: 'success' 
+  });
 };
 
 window.checkoutOrder = async function(tenderType) {
@@ -1048,9 +1100,17 @@ window.checkoutOrder = async function(tenderType) {
       body: JSON.stringify(payload)
     });
     const data = await res.json();
-    alert(`Order ${payload.id} checkout complete via ${tenderType}.\nStored in local SQLite WAL: ${data.sqliteWalPersisted ? 'YES' : 'NO'}`);
+    showToast({
+      title: 'Order Settled & Printed',
+      message: `Order #${payload.id.slice(-6)} recorded via ${tenderType}.\nLocal SQLite WAL Persisted: ${data.sqliteWalPersisted ? 'YES' : 'NO'}`,
+      type: 'success'
+    });
   } catch (err) {
-    alert(`Checkout complete in offline edge mode.\nTx ID: ${payload.id}`);
+    showToast({
+      title: 'Offline Order Queued',
+      message: `Order #${payload.id.slice(-6)} stored in local SQLite WAL offline queue (synced = 0).`,
+      type: 'warning'
+    });
   }
 
   // Update in-memory drawer if cash
@@ -1069,11 +1129,20 @@ window.bumpKDSTicket = function(idx) {
 };
 
 window.testPrintESCPOSTicket = function() {
-  alert('Dispatched raw ESC/POS binary ticket to Hotline Printer (Port 9100) with automatic station failover active.');
+  showToast({
+    title: 'Hardware Printer Dispatched',
+    message: 'Raw ESC/POS binary ticket sent to Hotline Thermal Printer (Port 9100) with automatic station failover active.',
+    type: 'info'
+  });
 };
 
 window.toggleOffline = function() {
   state.storeOffline = !state.storeOffline;
+  showToast({
+    title: state.storeOffline ? 'Offline Edge Mode Active' : 'Online Mode Restored',
+    message: state.storeOffline ? 'WAN link disabled. All checkouts will commit to local SQLite WAL.' : 'Connected to cloud ingestion pipeline.',
+    type: state.storeOffline ? 'warning' : 'success'
+  });
   renderApp();
 };
 
@@ -1114,7 +1183,11 @@ function renderModals() {
             state.selectedTable.covers = covers;
             state.selectedTable.serverName = server;
             state.selectedTable.seatedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            alert('${table.label} seated with ' + covers + ' covers assigned to ' + server + '. Ticket opened.');
+            showToast({
+              title: 'Table Seated & Ticket Opened',
+              message: '${table.label} seated with ' + covers + ' covers assigned to ' + server + '.',
+              type: 'success'
+            });
             closeModal();
           ">
             <div class="form-group">
@@ -1159,7 +1232,11 @@ function renderModals() {
               createdAt: new Date().toISOString().substring(0, 10),
               expectedDeliveryDate: '2026-08-20'
             });
-            alert('Purchase Order ' + poNumber + ' created and marked SENT.');
+            showToast({
+              title: 'Purchase Order Dispatched',
+              message: 'Purchase Order ' + poNumber + ' created and marked SENT to supplier.',
+              type: 'success'
+            });
             closeModal();
           ">
             <div class="form-group">
@@ -1205,7 +1282,11 @@ function renderModals() {
             po.status = 'RECEIVED';
             const cheese = state.stockLevels.find(s => s.ingredientId === 'ing-cheese');
             if (cheese) cheese.balance += 20;
-            alert('Goods Receipt Note (GRN) posted. Stock incremented by 20 kg. PO marked RECEIVED.');
+            showToast({
+              title: 'Goods Receipt Note (GRN) Posted',
+              message: 'Stock balance incremented by 20 kg. PO ' + po.poId + ' marked RECEIVED.',
+              type: 'success'
+            });
             closeModal();
           ">
             <div class="form-group">
@@ -1240,7 +1321,12 @@ function renderModals() {
 
           <form onsubmit="
             event.preventDefault();
-            alert('Physical Stock-Take submitted. Mozzarella variance +0.5 kg (+3.1% - flagged for review). Pepperoni in range.');
+            showToast({
+              title: 'Physical Stock-Take Reconciled',
+              message: 'Mozzarella variance +0.5 kg (+3.1% - flagged for review). Pepperoni in expected range.',
+              type: 'warning',
+              duration: 5000
+            });
             closeModal();
           ">
             <div class="form-group">
@@ -1344,7 +1430,16 @@ function renderModals() {
             <strong>Blind Reconciliation Policy:</strong> Expected drawer cash is hidden to prevent theft skimming. Count all physical currency and enter total below.
           </div>
 
-          <form onsubmit="event.preventDefault(); alert('Z-Report submitted. Actual: $430.00, Expected: $430.00. Variance: $0.00 (Balanced).'); closeModal();">
+          <form onsubmit="
+            event.preventDefault(); 
+            showToast({
+              title: 'EOD Z-Report Balanced',
+              message: 'Counted: $430.00 | Expected: $430.00 | Variance: $0.00 (Balanced). Drawer closed.',
+              type: 'success',
+              duration: 4500
+            }); 
+            closeModal();
+          ">
             <div class="form-group">
               <label>Actual Cash Counted ($ USD)</label>
               <input type="number" step="0.01" class="form-control" placeholder="0.00" value="430.00" style="font-family:var(--font-mono); font-size:1.35rem; font-weight:900;" required />
@@ -1374,7 +1469,15 @@ function renderModals() {
             </div>
             <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
           </div>
-          <form onsubmit="event.preventDefault(); alert('Safe Drop of $100.00 logged to Envelope #ENV-9915.'); closeModal();">
+          <form onsubmit="
+            event.preventDefault(); 
+            showToast({
+              title: 'Mid-Shift Safe Drop Logged',
+              message: 'Safe Drop of $100.00 recorded to Envelope #ENV-9915.',
+              type: 'info'
+            }); 
+            closeModal();
+          ">
             <div class="form-group">
               <label>Drop Amount ($ USD)</label>
               <input type="number" step="0.01" class="form-control" value="100.00" style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800;" required />
@@ -1408,7 +1511,15 @@ function renderModals() {
             </div>
             <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
           </div>
-          <form onsubmit="event.preventDefault(); alert('Kitchen waste logged.'); closeModal();">
+          <form onsubmit="
+            event.preventDefault(); 
+            showToast({
+              title: 'Kitchen Waste Logged',
+              message: 'Waste record submitted and inventory theoretical stock depleted.',
+              type: 'warning'
+            }); 
+            closeModal();
+          ">
             <div class="form-group">
               <label>Item Name</label>
               <input type="text" class="form-control" value="Mozzarella Cheese (Shredded)" required />
@@ -1446,7 +1557,15 @@ function renderModals() {
             </div>
             <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
           </div>
-          <form onsubmit="event.preventDefault(); alert('Menu item added to catalog.'); closeModal();">
+          <form onsubmit="
+            event.preventDefault(); 
+            showToast({
+              title: 'Master Menu Item Added',
+              message: 'Menu item added to catalog and synchronized with store edge nodes.',
+              type: 'success'
+            }); 
+            closeModal();
+          ">
             <div class="form-group">
               <label>Item Name</label>
               <input type="text" class="form-control" placeholder="e.g. Truffle Mushroom Flatbread" required />
@@ -1475,3 +1594,4 @@ function renderModals() {
 // Start
 initBackendConnection();
 renderApp();
+

@@ -482,7 +482,17 @@ app.get(['/', '/health'], (req, res) => {
     </div>
   </div>
 
+  <div id="diagToast" style="position:fixed; bottom:2rem; right:2rem; background:#1e293b; border:1.5px solid #38bdf8; color:#ffffff; padding:1rem 1.5rem; border-radius:12px; font-family:var(--font-main); font-weight:600; font-size:0.95rem; box-shadow:0 15px 35px rgba(0,0,0,0.8); display:none; align-items:center; gap:0.75rem; z-index:9999;"></div>
+
   <script>
+    function showDiagToast(msg, isSuccess = true) {
+      const t = document.getElementById('diagToast');
+      t.style.display = 'flex';
+      t.style.borderColor = isSuccess ? '#10b981' : '#f59e0b';
+      t.innerHTML = (isSuccess ? '✓ ' : 'ℹ ') + msg;
+      setTimeout(() => { t.style.display = 'none'; }, 4000);
+    }
+
     async function refreshTelemetry() {
       try {
         const res = await fetch('/health?json=1');
@@ -510,14 +520,14 @@ app.get(['/', '/health'], (req, res) => {
     async function triggerSync() {
       const res = await fetch('/api/sync/trigger', { method: 'POST' });
       const data = await res.json();
-      alert('Sync Triggered: ' + data.message + ' (Remaining Pending: ' + data.remainingPending + ')');
+      showDiagToast('Sync Triggered: ' + data.message + ' (Pending Remaining: ' + data.remainingPending + ')', true);
       refreshTelemetry();
     }
 
     async function toggleNetwork() {
       const res = await fetch('/api/network/toggle', { method: 'POST' });
       const data = await res.json();
-      alert('WAN State Toggled: Cloud Connected = ' + data.cloudConnected);
+      showDiagToast('WAN State Toggled: Cloud Connected = ' + data.cloudConnected, data.cloudConnected);
       refreshTelemetry();
     }
 
