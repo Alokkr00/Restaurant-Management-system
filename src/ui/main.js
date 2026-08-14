@@ -273,7 +273,7 @@ function renderActiveModule() {
   }
 }
 
-// 1. POS REGISTER
+// 1. POS REGISTER (GOLDEN PROPORTIONS & DUAL TOUCH TARGETS)
 function renderPOSRegisterWorkspace() {
   const filteredItems = state.activeCategory === 'ALL' 
     ? state.menuItems 
@@ -287,7 +287,7 @@ function renderPOSRegisterWorkspace() {
     <div class="section-header">
       <div>
         <h2 class="section-title">Point of Sale Register</h2>
-        <p class="section-subtitle">Terminal 01 &bull; Local SQLite WAL Persistence &bull; Sub-200ms LAN Ticket Dispatch</p>
+        <p class="section-subtitle">Terminal 01 &bull; Local SQLite WAL Persistence &bull; Sub-200ms LAN Dispatch</p>
       </div>
       <div class="header-actions">
         <span class="badge badge-online">DRAWER OPEN: $${state.drawerSession.expectedCashUSD.toFixed(2)} EXP</span>
@@ -298,17 +298,20 @@ function renderPOSRegisterWorkspace() {
     <!-- Category Selector Rail -->
     <div class="category-chips-rail">
       <button class="category-chip ${state.activeCategory === 'ALL' ? 'active' : ''}" onclick="setCategory('ALL')">All Categories</button>
-      <button class="category-chip ${state.activeCategory === 'Pizzas' ? 'active' : ''}" onclick="setCategory('Pizzas')">Pizzas</button>
-      <button class="category-chip ${state.activeCategory === 'Appetizers' ? 'active' : ''}" onclick="setCategory('Appetizers')">Appetizers & Sides</button>
-      <button class="category-chip ${state.activeCategory === 'Beverages' ? 'active' : ''}" onclick="setCategory('Beverages')">Beverages</button>
+      <button class="category-chip ${state.activeCategory === 'Pizzas' ? 'active' : ''}" onclick="setCategory('Pizzas')">🍕 Pizzas</button>
+      <button class="category-chip ${state.activeCategory === 'Appetizers' ? 'active' : ''}" onclick="setCategory('Appetizers')">🍗 Appetizers & Sides</button>
+      <button class="category-chip ${state.activeCategory === 'Entrees' ? 'active' : ''}" onclick="setCategory('Entrees')">🍝 Entrees / Mains</button>
+      <button class="category-chip ${state.activeCategory === 'Beverages' ? 'active' : ''}" onclick="setCategory('Beverages')">🥤 Beverages</button>
     </div>
 
     <div class="pos-layout">
-      <!-- Menu Item Grid -->
+      <!-- Menu Item Grid (Golden Proportion Cards) -->
       <div class="menu-grid">
         ${filteredItems.map(item => `
-          <div class="pos-card" onclick="openModifierModal('${item.id}')">
-            <img src="${item.image}" alt="${item.name}" class="pos-card-img" />
+          <div class="pos-card">
+            <div class="pos-card-img-wrapper" onclick="quickAddToCart('${item.id}')" title="Tap to Quick Add">
+              <img src="${item.image}" alt="${item.name}" class="pos-card-img" />
+            </div>
             <div class="pos-card-body">
               <div>
                 <div class="pos-card-title">${item.name}</div>
@@ -316,28 +319,36 @@ function renderPOSRegisterWorkspace() {
               </div>
               <div class="pos-card-footer">
                 <span class="pos-card-price">$${item.basePrice.toFixed(2)}</span>
-                <button class="btn-add-tile">Customize +</button>
+                <div class="tile-actions">
+                  <button class="btn-add-quick" onclick="quickAddToCart('${item.id}')" title="Quick Add to Ticket">+ Add</button>
+                  <button class="btn-customize-tile" onclick="openModifierModal('${item.id}')" title="Customize Toppings & Notes">⚙️</button>
+                </div>
               </div>
             </div>
           </div>
         `).join('')}
       </div>
 
-      <!-- Register Ticket Sidebar -->
+      <!-- Register Ticket Sidebar (Golden 38.2% Width) -->
       <div class="cart-sidebar">
         <div class="cart-header">
           <div>
-            <h3 style="font-size:1.1rem; font-weight:800;">Current Ticket</h3>
+            <h3 style="font-size:1.15rem; font-weight:800; color:#ffffff;">Current Ticket</h3>
             <span style="font-size:0.8rem; color:var(--text-muted);">Dine In &bull; Terminal 01</span>
           </div>
-          <button class="btn-primary btn-slate" style="padding:0.35rem 0.75rem; font-size:0.75rem;" onclick="clearCart()" ${state.cart.length === 0 ? 'disabled' : ''}>Clear</button>
+          <button class="btn-primary btn-slate" style="padding:0.4rem 0.85rem; font-size:0.78rem; min-height:36px;" onclick="clearCart()" ${state.cart.length === 0 ? 'disabled' : ''}>Clear</button>
         </div>
 
         <div class="cart-items">
           ${state.cart.length === 0 ? `
-            <div style="text-align:center; padding:4rem 1rem; color:var(--text-muted);">
-              <div style="font-size:1.1rem; font-weight:700;">Ticket is empty</div>
-              <div style="font-size:0.82rem; margin-top:0.35rem;">Tap any menu item on the left to add</div>
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:3rem 1rem; text-align:center;">
+              <div style="font-size:2.8rem; margin-bottom:0.75rem; opacity:0.8;">🍽️</div>
+              <div style="font-size:1.15rem; font-weight:800; color:#ffffff;">Ticket is empty</div>
+              <div style="font-size:0.82rem; color:var(--text-muted); margin-top:0.35rem; max-width:240px;">Tap any dish to quick-add, or tap ⚙️ to customize toppings.</div>
+              <div style="display:flex; gap:0.5rem; margin-top:1.25rem;">
+                <button class="btn-primary btn-slate" style="font-size:0.8rem; min-height:38px; padding:0.4rem 0.75rem;" onclick="selectModule('table_floor_plan')">🪑 Floor Plan</button>
+                <button class="btn-primary btn-emerald" style="font-size:0.8rem; min-height:38px; padding:0.4rem 0.75rem;" onclick="quickAddToCart('item-1')">⚡ Pepperoni</button>
+              </div>
             </div>
           ` : state.cart.map((item, idx) => `
             <div class="cart-item-row">
@@ -353,18 +364,18 @@ function renderPOSRegisterWorkspace() {
               <div class="cart-item-controls">
                 <div class="qty-control">
                   <button class="qty-btn" onclick="updateCartQty(${idx}, -1)">-</button>
-                  <span style="font-weight:800; width:24px; text-align:center;">${item.qty}</span>
+                  <span style="font-weight:900; font-family:var(--font-mono); font-size:1.1rem; width:28px; text-align:center;">${item.qty}</span>
                   <button class="qty-btn" onclick="updateCartQty(${idx}, 1)">+</button>
                 </div>
-                <span style="font-size:0.75rem; color:var(--text-muted);">$${(item.basePrice + (item.modifiersCost || 0)).toFixed(2)} ea</span>
+                <span style="font-size:0.78rem; color:var(--text-muted); font-family:var(--font-mono);">$${(item.basePrice + (item.modifiersCost || 0)).toFixed(2)} ea</span>
               </div>
             </div>
           `).join('')}
         </div>
 
-        <!-- Quick-Cash Tender Bar -->
+        <!-- Quick-Cash Tender Bar (56px Touch Target) -->
         <div class="quick-cash-bar">
-          <div class="quick-cash-title">Quick Cash Tender</div>
+          <div class="quick-cash-title">Quick Cash Tender (1-Thumb Tap)</div>
           <div class="quick-cash-buttons">
             <button class="btn-cash-quick" onclick="quickCashCheckout(10)" ${total > 10 || state.cart.length === 0 ? 'disabled' : ''}>$10</button>
             <button class="btn-cash-quick" onclick="quickCashCheckout(20)" ${total > 20 || state.cart.length === 0 ? 'disabled' : ''}>$20</button>
@@ -377,11 +388,11 @@ function renderPOSRegisterWorkspace() {
         <div class="cart-footer">
           <div class="totals-row">
             <span>Subtotal</span>
-            <span>$${subtotal.toFixed(2)}</span>
+            <span style="font-family:var(--font-mono); font-weight:700;">$${subtotal.toFixed(2)}</span>
           </div>
           <div class="totals-row">
             <span>Sales Tax (8%)</span>
-            <span>$${taxAmount.toFixed(2)}</span>
+            <span style="font-family:var(--font-mono); font-weight:700;">$${taxAmount.toFixed(2)}</span>
           </div>
           <div class="totals-row total-due">
             <span>Total Due</span>
@@ -390,10 +401,10 @@ function renderPOSRegisterWorkspace() {
 
           <div class="checkout-actions-grid">
             <button class="btn-primary btn-checkout" onclick="checkoutOrder('CARD')" ${state.cart.length === 0 ? 'disabled' : ''}>
-              Charge Card
+              💳 Charge Card
             </button>
             <button class="btn-primary btn-emerald btn-checkout" onclick="checkoutOrder('CASH')" ${state.cart.length === 0 ? 'disabled' : ''}>
-              Cash Tender
+              💵 Cash Tender
             </button>
           </div>
         </div>
@@ -402,7 +413,7 @@ function renderPOSRegisterWorkspace() {
   `;
 }
 
-// 2. TABLE FLOOR PLAN WORKSPACE
+// 2. TABLE FLOOR PLAN WORKSPACE (AMBIENT HALO GLOWS & FULL TOUCH TARGETS)
 function renderTableFloorPlanWorkspace() {
   return `
     <div class="section-header">
@@ -430,22 +441,22 @@ function renderTableFloorPlanWorkspace() {
               </div>
               <div class="table-meta-row">
                 <div><strong>${table.section}</strong> &bull; ${table.seats} Seats</div>
-                ${table.covers ? `<div style="margin-top:0.25rem; color:#ffffff;">${table.covers} Covers &bull; ${table.serverName}</div>` : '<div style="margin-top:0.25rem; color:var(--text-muted);">Ready to seat</div>'}
-                ${table.seatedAt ? `<div style="font-size:0.72rem; color:var(--accent-blue); margin-top:0.15rem;">Seated: ${table.seatedAt}</div>` : ''}
+                ${table.covers ? `<div style="margin-top:0.35rem; color:#ffffff; font-weight:700;">${table.covers} Covers &bull; ${table.serverName}</div>` : '<div style="margin-top:0.35rem; color:var(--text-muted);">Ready to seat</div>'}
+                ${table.seatedAt ? `<div style="font-size:0.75rem; color:var(--accent-blue); margin-top:0.25rem; font-family:var(--font-mono);">Seated: ${table.seatedAt}</div>` : ''}
               </div>
             </div>
 
             <div class="table-actions-row">
               ${table.status === 'VACANT' ? `
-                <button class="btn-primary btn-emerald" style="width:100%; min-height:38px; font-size:0.82rem;" onclick="openSeatTableModal('${table.tableId}')">
-                  Seat Party +
+                <button class="btn-primary btn-emerald" style="width:100%; min-height:46px; font-size:0.88rem;" onclick="openSeatTableModal('${table.tableId}')">
+                  🪑 Seat Party +
                 </button>
               ` : `
-                <button class="btn-primary btn-amber" style="flex:1; min-height:38px; font-size:0.8rem;" onclick="fireCourseForTable('${table.tableId}')">
-                  Fire Course &rarr;
+                <button class="btn-primary btn-amber" style="flex:1.2; min-height:46px; font-size:0.85rem;" onclick="fireCourseForTable('${table.tableId}')">
+                  🔥 Fire Course
                 </button>
-                <button class="btn-primary btn-rose" style="flex:1; min-height:38px; font-size:0.8rem;" onclick="closeTableCheckout('${table.tableId}')">
-                  Bill & Close
+                <button class="btn-primary btn-rose" style="flex:1; min-height:46px; font-size:0.85rem;" onclick="closeTableCheckout('${table.tableId}')">
+                  Settle Bill
                 </button>
               `}
             </div>
@@ -456,110 +467,7 @@ function renderTableFloorPlanWorkspace() {
   `;
 }
 
-// 3. PURCHASE ORDER & INVENTORY RECEIVING WORKSPACE
-function renderPOReceivingWorkspace() {
-  return `
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">Purchase Orders & Goods Receiving (GRN)</h2>
-        <p class="section-subtitle">Supplier Management &bull; Short Delivery Tracking &bull; Physical Stock Take Reconciliation</p>
-      </div>
-      <div class="header-actions">
-        <button class="btn-primary btn-slate" onclick="openModal('run_stock_take')">Run Stock-Take Count</button>
-        <button class="btn-primary btn-emerald" onclick="openModal('create_po')">Create Purchase Order +</button>
-      </div>
-    </div>
-
-    <!-- Stock Balances Summary -->
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
-      ${state.stockLevels.map(s => `
-        <div class="card">
-          <div style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">${s.name}</div>
-          <div style="font-family:var(--font-mono); font-size:1.5rem; font-weight:800; color:#34d399; margin-top:0.25rem;">
-            ${s.balance} <span style="font-size:0.9rem; color:var(--text-muted);">${s.unit}</span>
-          </div>
-          <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.25rem;">Stock on hand (ledger verified)</div>
-        </div>
-      `).join('')}
-    </div>
-
-    <!-- Purchase Orders Table -->
-    <div class="card" style="margin-bottom:1.5rem;">
-      <h3 style="font-size:1.1rem; font-weight:800; margin-bottom:1rem;">Purchase Orders Registry</h3>
-      <div class="table-container">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>PO Number</th>
-              <th>Supplier</th>
-              <th>Created Date</th>
-              <th>Expected Date</th>
-              <th>Total Cost</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${state.purchaseOrders.map(po => `
-              <tr>
-                <td><code>${po.poId}</code></td>
-                <td><strong>${po.supplierName}</strong></td>
-                <td>${po.createdAt}</td>
-                <td>${po.expectedDeliveryDate}</td>
-                <td style="font-family:var(--font-mono); font-weight:700;">₹${po.totalCostINR.toLocaleString()}</td>
-                <td>
-                  <span class="badge ${po.status === 'RECEIVED' ? 'badge-online' : po.status === 'SENT' ? 'badge-warning' : 'badge-locked'}">
-                    ${po.status}
-                  </span>
-                </td>
-                <td>
-                  ${po.status !== 'RECEIVED' ? `
-                    <button class="btn-primary btn-emerald" style="padding:0.35rem 0.75rem; font-size:0.75rem;" onclick="openReceiveGRNModal('${po.poId}')">
-                      Receive GRN &rarr;
-                    </button>
-                  ` : `
-                    <span style="color:#34d399; font-size:0.8rem; font-weight:700;">Stock Incremented ✓</span>
-                  `}
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Suppliers Table -->
-    <div class="card">
-      <h3 style="font-size:1.1rem; font-weight:800; margin-bottom:1rem;">Registered Wholesale Suppliers</h3>
-      <div class="table-container">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Supplier ID</th>
-              <th>Company Name</th>
-              <th>Phone</th>
-              <th>Lead Time</th>
-              <th>Payment Terms</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${state.suppliers.map(sup => `
-              <tr>
-                <td><code>${sup.supplierId}</code></td>
-                <td><strong>${sup.name}</strong></td>
-                <td>${sup.phone}</td>
-                <td>${sup.leadTimeDays} Days</td>
-                <td>Net ${sup.paymentTermsDays} Days</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `;
-}
-
-// 4. KITCHEN DISPLAY SYSTEM (KDS)
+// 3. KITCHEN DISPLAY SYSTEM (KDS WITH DYNAMIC URGENT TIMERS & MASSIVE BUMP BARS)
 function renderKDSWorkspace() {
   const filteredTickets = state.activeKDSStation === 'ALL'
     ? state.kdsTickets
@@ -595,11 +503,11 @@ function renderKDSWorkspace() {
           <div class="kds-ticket ${timerClass}">
             <div class="kds-ticket-header">
               <span class="kds-ticket-id">#${t.id.slice(-6)}</span>
-              <span class="kds-ticket-timer ${pillClass}">${timerFormatted} ${isRed ? 'LATE' : ''}</span>
+              <span class="kds-ticket-timer ${pillClass}">⏱️ ${timerFormatted} ${isRed ? 'LATE' : ''}</span>
             </div>
             <div class="kds-ticket-meta">
               <span><strong>${t.diningType}</strong></span>
-              <span>${t.source}</span>
+              <span style="font-weight:700; color:var(--accent-blue);">${t.source}</span>
             </div>
             <div class="kds-ticket-items">
               ${t.items.map(item => `
@@ -609,7 +517,7 @@ function renderKDSWorkspace() {
                     <span>${item.name}</span>
                   </div>
                   ${item.allergens && item.allergens.length > 0 ? `
-                    <span class="kds-allergen-tag">ALLERGEN: ${item.allergens.join(', ')}</span>
+                    <span class="kds-allergen-tag">⚠️ ALLERGEN: ${item.allergens.join(', ')}</span>
                   ` : ''}
                   ${item.modifiers && item.modifiers.length > 0 ? item.modifiers.map(m => `
                     <span class="kds-modifier-tag">${m}</span>
@@ -618,7 +526,7 @@ function renderKDSWorkspace() {
               `).join('')}
             </div>
             <button class="btn-bump" onclick="bumpKDSTicket(${idx})">
-              BUMP TICKET &check;
+              <span>✓ BUMP TICKET</span>
             </button>
           </div>
         `;
@@ -1112,6 +1020,31 @@ window.updateCartQty = function(idx, delta) {
 
 window.clearCart = function() {
   state.cart = [];
+  renderApp();
+};
+
+window.quickAddToCart = function(itemId) {
+  const item = state.menuItems.find(m => m.id === itemId);
+  if (!item) return;
+
+  const existing = state.cart.find(c => c.id === itemId && (!c.modifiers || c.modifiers.length === 0));
+  if (existing) {
+    existing.qty += 1;
+  } else {
+    state.cart.push({
+      ...item,
+      qty: 1,
+      modifiersCost: 0,
+      modifiers: []
+    });
+  }
+
+  showToast({
+    title: 'Added to Ticket',
+    message: `+1 ${item.name} ($${item.basePrice.toFixed(2)})`,
+    type: 'info',
+    duration: 1800
+  });
   renderApp();
 };
 
