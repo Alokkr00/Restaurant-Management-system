@@ -1605,40 +1605,95 @@ function renderModals() {
   }
 
   if (state.modalOpen === 'add_menu_item') {
+    const defaultImg = state.newMenuItemImage || '/truffle_pasta.jpg';
     return `
       <div class="modal-overlay" onclick="closeModal()">
-        <div class="modal-card" onclick="event.stopPropagation()">
+        <div class="modal-card" style="max-width: 580px; max-height: 90vh; overflow-y: auto;" onclick="event.stopPropagation()">
           <div class="modal-header">
             <div>
               <div class="modal-title">Add Master Menu Item</div>
-              <div class="modal-subtitle">Master Menu Catalog Governance</div>
+              <div class="modal-subtitle">Publish new dish with photo to Menu Catalog & POS Register</div>
             </div>
             <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
           </div>
-          <form onsubmit="
-            event.preventDefault(); 
-            showToast({
-              title: 'Master Menu Item Added',
-              message: 'Menu item added to catalog and synchronized with store edge nodes.',
-              type: 'success'
-            }); 
-            closeModal();
-          ">
-            <div class="form-group">
-              <label>Item Name</label>
-              <input type="text" class="form-control" placeholder="e.g. Truffle Mushroom Flatbread" required />
+
+          <form onsubmit="saveNewMenuItem(event)">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.85rem;">
+              <div class="form-group">
+                <label>Item Name</label>
+                <input type="text" id="newItemName" class="form-control" placeholder="e.g. Gourmet Truffle Tagliatelle" value="Gourmet Truffle Tagliatelle" required />
+              </div>
+              <div class="form-group">
+                <label>Category</label>
+                <select id="newItemCategory" class="form-control">
+                  <option value="Entrees" selected>Entrees / Mains</option>
+                  <option value="Pizzas">Pizzas</option>
+                  <option value="Appetizers">Appetizers & Sides</option>
+                  <option value="Beverages">Beverages</option>
+                </select>
+              </div>
             </div>
-            <div class="form-group">
-              <label>SKU</label>
-              <input type="text" class="form-control" placeholder="e.g. PIZ-TRUF-MED" required />
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.85rem;">
+              <div class="form-group">
+                <label>SKU Code</label>
+                <input type="text" id="newItemSKU" class="form-control" placeholder="e.g. PAS-TRUF-01" value="PAS-TRUF-01" required />
+              </div>
+              <div class="form-group">
+                <label>Base Price ($ USD)</label>
+                <input type="number" id="newItemPrice" step="0.01" class="form-control" placeholder="21.50" value="21.50" style="font-family:var(--font-mono); font-weight:800;" required />
+              </div>
             </div>
+
             <div class="form-group">
-              <label>Base Price ($)</label>
-              <input type="number" step="0.01" class="form-control" placeholder="17.99" style="font-family:var(--font-mono);" required />
+              <label>Dish Photo (Choose Preset, Upload File, or Paste URL)</label>
+              
+              <!-- 1. Preset Gallery Picker -->
+              <div class="image-preset-grid">
+                <div class="image-preset-btn ${defaultImg === '/truffle_pasta.jpg' ? 'selected' : ''}" onclick="selectNewMenuImagePreset('/truffle_pasta.jpg')">
+                  <img src="/truffle_pasta.jpg" class="image-preset-thumb" />
+                  <span class="image-preset-label">Truffle Pasta</span>
+                </div>
+                <div class="image-preset-btn ${defaultImg === '/cheeseburger.jpg' ? 'selected' : ''}" onclick="selectNewMenuImagePreset('/cheeseburger.jpg')">
+                  <img src="/cheeseburger.jpg" class="image-preset-thumb" />
+                  <span class="image-preset-label">Smash Burger</span>
+                </div>
+                <div class="image-preset-btn ${defaultImg === '/pepperoni_pizza.jpg' ? 'selected' : ''}" onclick="selectNewMenuImagePreset('/pepperoni_pizza.jpg')">
+                  <img src="/pepperoni_pizza.jpg" class="image-preset-thumb" />
+                  <span class="image-preset-label">Pepperoni</span>
+                </div>
+                <div class="image-preset-btn ${defaultImg === '/buffalo_wings.jpg' ? 'selected' : ''}" onclick="selectNewMenuImagePreset('/buffalo_wings.jpg')">
+                  <img src="/buffalo_wings.jpg" class="image-preset-thumb" />
+                  <span class="image-preset-label">Spicy Wings</span>
+                </div>
+                <div class="image-preset-btn ${defaultImg === '/garlic_knots.jpg' ? 'selected' : ''}" onclick="selectNewMenuImagePreset('/garlic_knots.jpg')">
+                  <img src="/garlic_knots.jpg" class="image-preset-thumb" />
+                  <span class="image-preset-label">Garlic Knots</span>
+                </div>
+              </div>
+
+              <!-- 2. Local File Upload or Custom URL -->
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.5rem; margin-top:0.5rem;">
+                <div class="file-upload-wrapper">
+                  <button type="button" class="btn-primary btn-slate" style="width:100%;">📁 Upload from PC</button>
+                  <input type="file" class="file-upload-input" accept="image/*" onchange="handleNewMenuImageFile(event)" />
+                </div>
+                <input type="text" id="newItemImageUrlInput" class="form-control" style="font-size:0.85rem;" placeholder="Or paste Image URL..." value="${defaultImg.startsWith('data:') ? '' : defaultImg}" oninput="handleNewMenuImageUrl(this.value)" />
+              </div>
+
+              <!-- 3. Live Preview Card -->
+              <div class="image-preview-container">
+                <img id="newItemLivePreviewImg" src="${defaultImg}" class="image-live-preview" />
+                <div>
+                  <div style="font-size:0.85rem; font-weight:800; color:#ffffff;">POS Tile Live Preview</div>
+                  <div style="font-size:0.75rem; color:var(--text-muted);">This photo will be displayed on 15" touchscreens and online delivery menus.</div>
+                </div>
+              </div>
             </div>
-            <div style="display:flex; justify-content:flex-end; gap:0.65rem; margin-top:1.75rem;">
+
+            <div style="display:flex; justify-content:flex-end; gap:0.65rem; margin-top:1.5rem;">
               <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
-              <button type="submit" class="btn-primary">Save to Catalog</button>
+              <button type="submit" class="btn-primary btn-emerald">Publish Menu Item</button>
             </div>
           </form>
         </div>
@@ -1648,6 +1703,63 @@ function renderModals() {
 
   return '';
 }
+
+// Global Image Upload & Catalog Handlers
+window.selectNewMenuImagePreset = function(imgPath) {
+  state.newMenuItemImage = imgPath;
+  renderApp();
+};
+
+window.handleNewMenuImageFile = function(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    state.newMenuItemImage = event.target.result;
+    renderApp();
+    showToast({ title: 'Photo Loaded', message: 'Local image uploaded into memory preview.', type: 'info' });
+  };
+  reader.readAsDataURL(file);
+};
+
+window.handleNewMenuImageUrl = function(val) {
+  if (val && val.trim()) {
+    state.newMenuItemImage = val.trim();
+    const preview = document.getElementById('newItemLivePreviewImg');
+    if (preview) preview.src = val.trim();
+  }
+};
+
+window.saveNewMenuItem = function(e) {
+  e.preventDefault();
+  const name = document.getElementById('newItemName').value;
+  const category = document.getElementById('newItemCategory').value;
+  const sku = document.getElementById('newItemSKU').value;
+  const price = parseFloat(document.getElementById('newItemPrice').value);
+  const image = state.newMenuItemImage || '/truffle_pasta.jpg';
+
+  const newItem = {
+    id: `item-${Date.now()}`,
+    sku: sku,
+    name: name,
+    category: category,
+    basePrice: price,
+    image: image,
+    allergens: ['DAIRY'],
+    isBrandLocked: false,
+    version: 1,
+  };
+
+  state.menuItems.push(newItem);
+  showToast({
+    title: 'Menu Item Published!',
+    message: `${name} ($${price.toFixed(2)}) published to catalog with photo and ready on POS Register.`,
+    type: 'success',
+    duration: 5000
+  });
+
+  closeModal();
+};
 
 // Start
 initBackendConnection();
