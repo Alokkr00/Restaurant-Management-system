@@ -10,6 +10,12 @@ import { JWTAuthService } from '../security/tenant-context.js';
 import { InventoryRecipeEngine } from '../inventory/recipe-engine.js';
 import { TableFloorPlanEngine } from '../pos/table-floor-plan.js';
 import { PurchaseOrderEngine } from '../inventory/purchase-order-engine.js';
+import { runMigrations } from './db/migrations.js';
+import { OrderStateMachine } from '../pos/order-state-machine.js';
+import { DurablePrintQueueWorker } from '../hardware/print-queue-worker.js';
+import { TransactionalOutboxSyncEngine } from '../shared/outbox-sync-engine.js';
+import { CertifiedPaymentGateway } from '../fintech/payment-gateway.js';
+import { StoreAuthService } from '../security/store-auth.js';
 
 const app = express();
 app.use(cors());
@@ -33,42 +39,27 @@ const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');
 db.pragma('synchronous = NORMAL');
 
-// Initialize Database Schemas
-db.exec(`
-  CREATE TABLE IF NOT EXISTS store_config (
-    store_id TEXT PRIMARY KEY,
-    brand_id TEXT NOT NULL,
-    region_id TEXT NOT NULL,
-    config_json TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
+// Run Production Database Migrations
+runMigrations(db);
 
-  CREATE TABLE IF NOT EXISTS pos_transactions (
-    id TEXT PRIMARY KEY,
-    store_id TEXT NOT NULL,
-    terminal_id TEXT NOT NULL,
-    timestamp TEXT NOT NULL,
-    payload_json TEXT NOT NULL,
-    subtotal REAL NOT NULL,
-    tax REAL NOT NULL,
-    total REAL NOT NULL,
-    synced INTEGER NOT NULL DEFAULT 0,
-    offline_mode INTEGER NOT NULL DEFAULT 0
-  );
+// Initialize Core Transactional Engines
+const orderStateMachine = new OrderStateMachine(db);
+const storeAuthService = new StoreAuthService(db);
+const paymentGateway = new CertifiedPaymentGateway(db);
+const outboxSyncEngine = new TransactionalOutboxSyncEngine(db);
+const printQueueWorker = new DurablePrintQueueWorker(db, [
+  { printerId: 'printer-hotline-primary', name: 'Kitchen Hotline Thermal', host: '192.168.1.150', port: 9100, timeoutMs: 1500, fallbackPrinterId: 'printer-expo-backup' },
+  { printerId: 'printer-receipt-primary', name: 'Front Counter Receipt Thermal', host: '192.168.1.152', port: 9100, timeoutMs: 1500 },
+  { printerId: 'printer-expo-backup', name: 'Expo Backup Printer', host: '192.168.1.151', port: 9100, timeoutMs: 1500 }
+]);
 
-  CREATE TABLE IF NOT EXISTS audit_ledger (
-    id TEXT PRIMARY KEY,
-    timestamp TEXT NOT NULL,
-    actor TEXT NOT NULL,
-    action TEXT NOT NULL,
-    target TEXT NOT NULL,
-    hash TEXT NOT NULL
-  );
-`);
+// Start Background Workers
+printQueueWorker.start(1000);
+outboxSyncEngine.start(5000);
 
-// Prepared statement cache for high-throughput non-blocking operations
+// Prepared statement cache for legacy compatibility & health stats
 const insertTxStmt = db.prepare(
-  'INSERT INTO pos_transactions (id, store_id, terminal_id, timestamp, payload_json, subtotal, tax, total, synced, offline_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  'INSERT OR REPLACE INTO pos_transactions (id, store_id, terminal_id, timestamp, payload_json, subtotal, tax, total, synced, offline_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
 );
 const getPendingSyncStmt = db.prepare('SELECT id, payload_json FROM pos_transactions WHERE synced = 0 ORDER BY timestamp ASC LIMIT 50');
 const countPendingSyncStmt = db.prepare('SELECT COUNT(*) as count FROM pos_transactions WHERE synced = 0');
@@ -90,8 +81,8 @@ const fallbackExpoPrinter: PrinterStationConfig = {
   port: 9100,
 };
 
-let isCloudConnected = false;
-let lastSyncTimestamp: string | null = null;
+let isCloudConnected = true;
+let lastSyncTimestamp: string | null = new Date().toISOString();
 let syncCycleCount = 0;
 
 // Background Cloud Sync Worker: Asynchronously flushes offline transactions (synced = 0) to HQ
@@ -546,31 +537,132 @@ app.get(['/', '/health'], (req, res) => {
   return res.send(html);
 });
 
-app.get('/api/menu', (req, res) => {
-  res.json({ success: true, storeId: STORE_NODE_ID, menuItems });
-});
-
-// Manual or automated cloud sync flush endpoint
-app.post('/api/sync/trigger', async (req, res) => {
-  isCloudConnected = true;
-  const result = await runCloudSyncWorkerCycle();
+// ─── Production Core API Endpoints (v1) ──────────────────────────────────
+// 1. Employee Login with PIN
+app.post('/api/v1/auth/login', (req, res) => {
+  const { storeId, pin } = req.body;
+  const user = storeAuthService.authenticateUser(storeId || STORE_NODE_ID, pin);
+  if (!user) {
+    return res.status(401).json({ success: false, error: 'Invalid store employee PIN.' });
+  }
   res.json({
     success: true,
-    message: `Flushed ${result.flushedCount} offline transactions to cloud.`,
-    remainingPending: result.remainingCount,
-    lastSyncTimestamp,
+    user: {
+      userId: user.user_id,
+      name: user.name,
+      role: user.role,
+      storeId: user.store_id,
+    },
   });
 });
 
-// Toggle network state (simulate online vs offline WAN drop)
-app.post('/api/network/toggle', (req, res) => {
-  isCloudConnected = !isCloudConnected;
-  wss.clients.forEach((client) => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify({ type: 'NETWORK_STATE_CHANGED', cloudConnected: isCloudConnected }));
+// 2. Server-Side Priced Order Creation (Integer Minor Units / Cents)
+app.post('/api/v1/orders', (req, res) => {
+  try {
+    const { items, orderType, tableId, terminalId, idempotencyKey } = req.body;
+    const order = orderStateMachine.createAndPriceOrder({
+      storeId: STORE_NODE_ID,
+      terminalId: terminalId || 'pos-01',
+      tableId,
+      orderType: orderType || 'DINE_IN',
+      items,
+      idempotencyKey,
+    });
+    res.status(201).json({ success: true, order });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// 3. Order Fetch by ID
+app.get('/api/v1/orders/:id', (req, res) => {
+  const order = orderStateMachine.getOrderById(req.params.id);
+  if (!order) {
+    return res.status(404).json({ success: false, error: `Order '${req.params.id}' not found.` });
+  }
+  res.json({ success: true, order });
+});
+
+// 4. Order State Transition (e.g. SENT_TO_KITCHEN, READY, CLOSED, VOIDED)
+app.post('/api/v1/orders/:id/transition', (req, res) => {
+  try {
+    const { newStatus, actorUserId, reason, managerPin } = req.body;
+
+    // Step-up manager verification for voiding
+    if (newStatus === 'VOIDED') {
+      if (!managerPin) {
+        return res.status(403).json({ success: false, error: 'Manager PIN is required to void an order.' });
+      }
+      const verify = storeAuthService.verifyManagerStepUp(STORE_NODE_ID, managerPin);
+      if (!verify.authorized) {
+        return res.status(403).json({ success: false, error: 'Unauthorized: Invalid manager PIN for void approval.' });
+      }
     }
-  });
-  res.json({ success: true, cloudConnected: isCloudConnected });
+
+    orderStateMachine.transitionState(req.params.id, newStatus, actorUserId, reason);
+    res.json({ success: true, orderId: req.params.id, newStatus });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// 5. Atomic Checkout & Payment Settlement (Creates Print Jobs & Outbox Event)
+app.post('/api/v1/orders/:id/pay', async (req, res) => {
+  try {
+    const { tenderType, tenderAmountCents, terminalRef, idempotencyKey } = req.body;
+    const result = orderStateMachine.processPayment({
+      orderId: req.params.id,
+      tenderType: tenderType || 'CASH',
+      tenderAmountCents,
+      terminalRef,
+      idempotencyKey,
+    });
+
+    // Broadcast live ticket update to KDS terminals over LAN WebSocket
+    wss.clients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(
+          JSON.stringify({
+            type: 'KDS_NEW_TICKET',
+            ticket: {
+              id: result.orderId,
+              paymentId: result.paymentId,
+              totalCents: result.amountCents,
+              status: 'PAID',
+              timestamp: new Date().toISOString(),
+            },
+          })
+        );
+      }
+    });
+
+    res.json({ success: true, ...result });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// 6. Durable Print Jobs List & Manager Retry/Reroute
+app.get('/api/v1/print-jobs', (req, res) => {
+  const jobs = db.prepare('SELECT * FROM print_jobs ORDER BY created_at DESC LIMIT 50').all();
+  res.json({ success: true, printJobs: jobs });
+});
+
+app.post('/api/v1/print-jobs/:id/retry', (req, res) => {
+  printQueueWorker.retryJob(req.params.id);
+  res.json({ success: true, message: `Print job '${req.params.id}' queued for retry.` });
+});
+
+app.post('/api/v1/print-jobs/:id/reroute', (req, res) => {
+  const { targetPrinterId } = req.body;
+  printQueueWorker.rerouteJob(req.params.id, targetPrinterId || 'printer-expo-backup');
+  res.json({ success: true, message: `Print job '${req.params.id}' rerouted to '${targetPrinterId}'.` });
+});
+
+// 7. Transactional Outbox Flush Endpoint
+app.post('/api/v1/sync/flush', async (req, res) => {
+  const result = await outboxSyncEngine.flushPendingBatch();
+  res.json({ success: true, ...result });
 });
 
 // ─── Table Floor Plan Endpoints ──────────────────────────────────────────
