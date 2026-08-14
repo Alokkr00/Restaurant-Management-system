@@ -10,6 +10,7 @@ const state = {
   storeOffline: false,
   apiConnected: false,
   wsConnected: false,
+  backOfficeMenuOpen: false,
   modalOpen: null, // null | 'add_menu_item' | 'log_spoilage' | 'cash_drop' | 'blind_z_report' | 'item_modifiers' | 'seat_table' | 'create_po' | 'receive_grn' | 'run_stock_take'
   selectedModifierItem: null,
   selectedTable: null,
@@ -169,6 +170,15 @@ async function initBackendConnection() {
 }
 
 function renderApp() {
+  const isBackOfficeActive = ['inventory_prep', 'labor_shifts', 'menu_catalog', 'franchise_financials'].includes(state.activeModule);
+  const backOfficeLabels = {
+    inventory_prep: 'Inventory & Prep',
+    labor_shifts: 'Labor & Shifts',
+    menu_catalog: 'Menu Catalog',
+    franchise_financials: 'Financials & GL'
+  };
+  const backOfficeBtnLabel = isBackOfficeActive ? `${backOfficeLabels[state.activeModule]} ▾` : 'Back Office ▾';
+
   const appEl = document.getElementById('app');
   appEl.innerHTML = `
     <!-- Top Navigation -->
@@ -183,21 +193,55 @@ function renderApp() {
 
       <!-- Module Navigation Tabs -->
       <nav class="module-nav">
-        <button class="nav-tab ${state.activeModule === 'pos_register' ? 'active' : ''}" onclick="selectModule('pos_register')">POS Register</button>
-        <button class="nav-tab ${state.activeModule === 'table_floor_plan' ? 'active' : ''}" onclick="selectModule('table_floor_plan')">Table Floor (${state.tables.filter(t => t.status !== 'VACANT').length}/${state.tables.length})</button>
-        <button class="nav-tab ${state.activeModule === 'kds' ? 'active' : ''}" onclick="selectModule('kds')">Kitchen KDS (${state.kdsTickets.length})</button>
-        <button class="nav-tab ${state.activeModule === 'cash_management' ? 'active' : ''}" onclick="selectModule('cash_management')">Cash & Drawers</button>
-        <button class="nav-tab ${state.activeModule === 'po_receiving' ? 'active' : ''}" onclick="selectModule('po_receiving')">PO Receiving (${state.purchaseOrders.length})</button>
-        <button class="nav-tab ${state.activeModule === 'inventory_prep' ? 'active' : ''}" onclick="selectModule('inventory_prep')">Inventory & Prep</button>
-        <button class="nav-tab ${state.activeModule === 'labor_shifts' ? 'active' : ''}" onclick="selectModule('labor_shifts')">Labor & Shifts</button>
-        <button class="nav-tab ${state.activeModule === 'menu_catalog' ? 'active' : ''}" onclick="selectModule('menu_catalog')">Menu Catalog</button>
-        <button class="nav-tab ${state.activeModule === 'franchise_financials' ? 'active' : ''}" onclick="selectModule('franchise_financials')">Financials & GL</button>
+        <button class="nav-tab ${state.activeModule === 'pos_register' ? 'active' : ''}" onclick="selectModule('pos_register')">
+          <span>🛒 POS Register</span>
+        </button>
+        <button class="nav-tab ${state.activeModule === 'table_floor_plan' ? 'active' : ''}" onclick="selectModule('table_floor_plan')">
+          <span>🪑 Table Floor (${state.tables.filter(t => t.status !== 'VACANT').length}/${state.tables.length})</span>
+        </button>
+        <button class="nav-tab ${state.activeModule === 'kds' ? 'active' : ''}" onclick="selectModule('kds')">
+          <span>🍳 Kitchen KDS (${state.kdsTickets.length})</span>
+        </button>
+        <button class="nav-tab ${state.activeModule === 'cash_management' ? 'active' : ''}" onclick="selectModule('cash_management')">
+          <span>💵 Cash & Drawers</span>
+        </button>
+        <button class="nav-tab ${state.activeModule === 'po_receiving' ? 'active' : ''}" onclick="selectModule('po_receiving')">
+          <span>📦 PO Receiving (${state.purchaseOrders.length})</span>
+        </button>
+
+        <!-- Back Office Dropdown -->
+        <div class="nav-dropdown">
+          <button class="nav-dropdown-btn ${isBackOfficeActive ? 'active' : ''}" onclick="toggleBackOfficeDropdown(event)">
+            <span>🏢 ${backOfficeBtnLabel}</span>
+          </button>
+          ${state.backOfficeMenuOpen ? `
+            <div class="nav-dropdown-menu" onclick="event.stopPropagation()">
+              <button class="nav-dropdown-item ${state.activeModule === 'inventory_prep' ? 'active' : ''}" onclick="selectModule('inventory_prep')">
+                <span>🥗 Inventory & Batch Prep</span>
+              </button>
+              <button class="nav-dropdown-item ${state.activeModule === 'labor_shifts' ? 'active' : ''}" onclick="selectModule('labor_shifts')">
+                <span>👥 Labor & Shift Scheduling</span>
+              </button>
+              <button class="nav-dropdown-item ${state.activeModule === 'menu_catalog' ? 'active' : ''}" onclick="selectModule('menu_catalog')">
+                <span>📋 Menu Catalog & Governance</span>
+              </button>
+              <button class="nav-dropdown-item ${state.activeModule === 'franchise_financials' ? 'active' : ''}" onclick="selectModule('franchise_financials')">
+                <span>📊 Financials & NetSuite GL</span>
+              </button>
+            </div>
+          ` : ''}
+        </div>
       </nav>
 
-      <!-- Connection Status Pill -->
-      <div class="status-pill ${state.storeOffline ? 'offline' : ''}" onclick="toggleOffline()" title="Click to simulate WAN drop">
-        <span class="status-dot"></span>
-        <span>${state.storeOffline ? 'EDGE OFFLINE' : `EDGE ONLINE (${state.wsConnected ? 'LAN WS' : 'REST'})`}</span>
+      <!-- Right Actions & Diagnostics -->
+      <div class="nav-actions">
+        <a href="${EDGE_SERVER_URL}/health" target="_blank" class="btn-nav-diag" title="Open Live Edge Node Telemetry & Hardware Diagnostics">
+          ⚡ Diagnostics
+        </a>
+        <div class="status-pill ${state.storeOffline ? 'offline' : ''}" onclick="toggleOffline()" title="Click to simulate WAN network drop">
+          <span class="status-dot"></span>
+          <span>${state.storeOffline ? 'EDGE OFFLINE' : `EDGE ONLINE (${state.wsConnected ? 'LAN WS' : 'REST'})`}</span>
+        </div>
       </div>
     </header>
 
@@ -956,8 +1000,22 @@ window.showToast = function({ title, message, type = 'success', duration = 3800 
 // Global actions
 window.selectModule = function(mod) {
   state.activeModule = mod;
+  state.backOfficeMenuOpen = false;
   renderApp();
 };
+
+window.toggleBackOfficeDropdown = function(e) {
+  if (e) e.stopPropagation();
+  state.backOfficeMenuOpen = !state.backOfficeMenuOpen;
+  renderApp();
+};
+
+window.addEventListener('click', (e) => {
+  if (state.backOfficeMenuOpen) {
+    state.backOfficeMenuOpen = false;
+    renderApp();
+  }
+});
 
 window.setCategory = function(cat) {
   state.activeCategory = cat;
