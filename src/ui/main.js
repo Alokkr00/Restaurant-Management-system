@@ -396,19 +396,25 @@ function renderApp() {
 function renderActiveModule() {
   switch (state.activeModule) {
     case 'pos_register': return renderPOSRegisterWorkspace();
-    case 'table_floor_plan': return renderTableFloorPlanWorkspace();
-    case 'kds': return renderKDSWorkspace();
-    case 'cash_management': return renderCashManagementWorkspace();
-    case 'po_receiving': return renderPOReceivingWorkspace();
-    case 'inventory_prep': return renderInventoryPrepWorkspace();
-    case 'labor_shifts': return renderLaborShiftsWorkspace();
-    case 'menu_catalog': return renderMenuCatalogWorkspace();
-    case 'franchise_financials': return renderFinancialsWorkspace();
-    default: return renderPOSRegisterWorkspace();
+    default: {
+      let content = '';
+      switch (state.activeModule) {
+        case 'table_floor_plan': content = renderTableFloorPlanWorkspace(); break;
+        case 'kds': content = renderKDSWorkspace(); break;
+        case 'cash_management': content = renderCashManagementWorkspace(); break;
+        case 'po_receiving': content = renderPOReceivingWorkspace(); break;
+        case 'inventory_prep': content = renderInventoryPrepWorkspace(); break;
+        case 'labor_shifts': content = renderLaborShiftsWorkspace(); break;
+        case 'menu_catalog': content = renderMenuCatalogWorkspace(); break;
+        case 'franchise_financials': content = renderFinancialsWorkspace(); break;
+        default: content = renderPOSRegisterWorkspace(); break;
+      }
+      return `<div class="workspace-scroll-container">${content}</div>`;
+    }
   }
 }
 
-// 1. POS REGISTER (GOLDEN PROPORTIONS & DUAL TOUCH TARGETS)
+// 1. POS REGISTER (FIXED ZERO-SCROLL SPLIT VIEWPORT)
 function renderPOSRegisterWorkspace() {
   const filteredItems = state.activeCategory === 'ALL' 
     ? state.menuItems 
@@ -419,54 +425,57 @@ function renderPOSRegisterWorkspace() {
   const total = subtotal + taxAmount;
 
   return `
-    <div class="section-header">
-      <div>
-        <h2 class="section-title">Point of Sale Register</h2>
-        <p class="section-subtitle">Terminal 01 &bull; Local SQLite WAL Persistence &bull; Sub-200ms LAN Dispatch</p>
-      </div>
-      <div class="header-actions">
-        <span class="badge badge-online">DRAWER OPEN: $${state.drawerSession.expectedCashUSD.toFixed(2)} EXP</span>
-        <button class="btn-primary btn-slate" onclick="openModal('cash_drop')">Mid-Shift Safe Drop</button>
-      </div>
-    </div>
+    <div class="pos-workspace-split">
+      <!-- Left Section: Header, Category Rail, Independently Scrollable Food Grid -->
+      <div class="pos-menu-column">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">Point of Sale Register</h2>
+            <p class="section-subtitle">Terminal 01 &bull; Local SQLite WAL Persistence &bull; Sub-200ms LAN Dispatch</p>
+          </div>
+          <div class="header-actions">
+            <span class="badge badge-online">DRAWER OPEN: $${state.drawerSession.expectedCashUSD.toFixed(2)} EXP</span>
+            <button class="btn-primary btn-slate" onclick="openModal('cash_drop')">Mid-Shift Safe Drop</button>
+          </div>
+        </div>
 
-    <!-- Category Selector Rail -->
-    <div class="category-chips-rail">
-      <button class="category-chip ${state.activeCategory === 'ALL' ? 'active' : ''}" onclick="setCategory('ALL')">All Categories</button>
-      <button class="category-chip ${state.activeCategory === 'Pizzas' ? 'active' : ''}" onclick="setCategory('Pizzas')">🍕 Pizzas</button>
-      <button class="category-chip ${state.activeCategory === 'Appetizers' ? 'active' : ''}" onclick="setCategory('Appetizers')">🍗 Appetizers & Sides</button>
-      <button class="category-chip ${state.activeCategory === 'Entrees' ? 'active' : ''}" onclick="setCategory('Entrees')">🍝 Entrees / Mains</button>
-      <button class="category-chip ${state.activeCategory === 'Beverages' ? 'active' : ''}" onclick="setCategory('Beverages')">🥤 Beverages</button>
-    </div>
+        <!-- Category Selector Rail -->
+        <div class="category-chips-rail">
+          <button class="category-chip ${state.activeCategory === 'ALL' ? 'active' : ''}" onclick="setCategory('ALL')">All Categories</button>
+          <button class="category-chip ${state.activeCategory === 'Pizzas' ? 'active' : ''}" onclick="setCategory('Pizzas')">🍕 Pizzas</button>
+          <button class="category-chip ${state.activeCategory === 'Appetizers' ? 'active' : ''}" onclick="setCategory('Appetizers')">🍗 Appetizers & Sides</button>
+          <button class="category-chip ${state.activeCategory === 'Entrees' ? 'active' : ''}" onclick="setCategory('Entrees')">🍝 Entrees / Mains</button>
+          <button class="category-chip ${state.activeCategory === 'Beverages' ? 'active' : ''}" onclick="setCategory('Beverages')">🥤 Beverages</button>
+        </div>
 
-    <div class="pos-layout">
-      <!-- Menu Item Grid (Golden Proportion Cards) -->
-      <div class="menu-grid">
-        ${filteredItems.map(item => `
-          <div class="pos-card">
-            <div class="pos-card-img-wrapper" onclick="quickAddToCart('${item.id}')" title="Tap to Quick Add">
-              <img src="${item.image}" alt="${item.name}" class="pos-card-img" />
-            </div>
-            <div class="pos-card-body">
-              <div>
-                <div class="pos-card-title">${item.name}</div>
-                <div class="pos-card-meta">${item.category} &bull; ${item.sku}</div>
+        <!-- Independently Scrollable Food Menu Grid -->
+        <div class="menu-grid-scroll">
+          ${filteredItems.map(item => `
+            <div class="pos-card">
+              <div class="pos-card-img-wrapper" onclick="quickAddToCart('${item.id}')" title="Tap to Quick Add">
+                <img src="${item.image}" alt="${item.name}" class="pos-card-img" />
               </div>
-              <div class="pos-card-footer">
-                <span class="pos-card-price">$${item.basePrice.toFixed(2)}</span>
-                <div class="tile-actions">
-                  <button class="btn-add-quick" onclick="quickAddToCart('${item.id}')" title="Quick Add to Ticket">+ Add</button>
-                  <button class="btn-customize-tile" onclick="openModifierModal('${item.id}')" title="Customize Toppings & Notes">⚙️</button>
+              <div class="pos-card-body">
+                <div>
+                  <div class="pos-card-title">${item.name}</div>
+                  <div class="pos-card-meta">${item.category} &bull; ${item.sku}</div>
+                </div>
+                <div class="pos-card-footer">
+                  <span class="pos-card-price">$${item.basePrice.toFixed(2)}</span>
+                  <div class="tile-actions">
+                    <button class="btn-add-quick" onclick="quickAddToCart('${item.id}')" title="Quick Add to Ticket">+ Add</button>
+                    <button class="btn-customize-tile" onclick="openModifierModal('${item.id}')" title="Customize Toppings & Notes">⚙️</button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        `).join('')}
+          `).join('')}
+        </div>
       </div>
 
-      <!-- Register Ticket Sidebar (Golden 38.2% Width) -->
-      <div class="cart-sidebar">
-        <div class="cart-header">
+      <!-- Right Section: Permanently Pinned Cart Sidebar (100% Height, Fixed Footer) -->
+      <div class="cart-sidebar-docked">
+        <div class="cart-header-fixed">
           <div>
             <h3 style="font-size:1.15rem; font-weight:800; color:#ffffff;">Current Ticket</h3>
             <span style="font-size:0.8rem; color:var(--text-muted);">Dine In &bull; Terminal 01</span>
@@ -474,15 +483,16 @@ function renderPOSRegisterWorkspace() {
           <button class="btn-primary btn-slate" style="padding:0.4rem 0.85rem; font-size:0.78rem; min-height:36px;" onclick="clearCart()" ${state.cart.length === 0 ? 'disabled' : ''}>Clear</button>
         </div>
 
-        <div class="cart-items">
+        <!-- Scrollable Ticket Items List inside Cart -->
+        <div class="cart-items-scroll">
           ${state.cart.length === 0 ? `
-            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:3rem 1rem; text-align:center;">
-              <div style="font-size:2.8rem; margin-bottom:0.75rem; opacity:0.8;">🍽️</div>
-              <div style="font-size:1.15rem; font-weight:800; color:#ffffff;">Ticket is empty</div>
-              <div style="font-size:0.82rem; color:var(--text-muted); margin-top:0.35rem; max-width:240px;">Tap any dish to quick-add, or tap ⚙️ to customize toppings.</div>
-              <div style="display:flex; gap:0.5rem; margin-top:1.25rem;">
-                <button class="btn-primary btn-slate" style="font-size:0.8rem; min-height:38px; padding:0.4rem 0.75rem;" onclick="selectModule('table_floor_plan')">🪑 Floor Plan</button>
-                <button class="btn-primary btn-emerald" style="font-size:0.8rem; min-height:38px; padding:0.4rem 0.75rem;" onclick="quickAddToCart('item-1')">⚡ Pepperoni</button>
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2rem 1rem; text-align:center; margin:auto 0;">
+              <div style="font-size:2.5rem; margin-bottom:0.5rem; opacity:0.8;">🍽️</div>
+              <div style="font-size:1.1rem; font-weight:800; color:#ffffff;">Ticket is empty</div>
+              <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.25rem; max-width:220px;">Tap any dish to quick-add, or tap ⚙️ to customize toppings.</div>
+              <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+                <button class="btn-primary btn-slate" style="font-size:0.8rem; min-height:36px; padding:0.35rem 0.75rem;" onclick="selectModule('table_floor_plan')">🪑 Floor Plan</button>
+                <button class="btn-primary btn-emerald" style="font-size:0.8rem; min-height:36px; padding:0.35rem 0.75rem;" onclick="quickAddToCart('item-1')">⚡ Pepperoni</button>
               </div>
             </div>
           ` : state.cart.map((item, idx) => `
@@ -508,33 +518,34 @@ function renderPOSRegisterWorkspace() {
           `).join('')}
         </div>
 
-        <!-- Quick-Cash Tender Bar (56px Touch Target) -->
-        <div class="quick-cash-bar">
-          <div class="quick-cash-title">Quick Cash Tender (1-Thumb Tap)</div>
-          <div class="quick-cash-buttons">
-            <button class="btn-cash-quick" onclick="quickCashCheckout(10)" ${total > 10 || state.cart.length === 0 ? 'disabled' : ''}>$10</button>
-            <button class="btn-cash-quick" onclick="quickCashCheckout(20)" ${total > 20 || state.cart.length === 0 ? 'disabled' : ''}>$20</button>
-            <button class="btn-cash-quick" onclick="quickCashCheckout(50)" ${total > 50 || state.cart.length === 0 ? 'disabled' : ''}>$50</button>
-            <button class="btn-cash-quick" onclick="quickCashCheckout(${total})" ${state.cart.length === 0 ? 'disabled' : ''}>Exact</button>
-          </div>
-        </div>
-
-        <!-- Cart Totals & Checkout -->
-        <div class="cart-footer">
-          <div class="totals-row">
-            <span>Subtotal</span>
-            <span style="font-family:var(--font-mono); font-weight:700;">$${subtotal.toFixed(2)}</span>
-          </div>
-          <div class="totals-row">
-            <span>Sales Tax (8%)</span>
-            <span style="font-family:var(--font-mono); font-weight:700;">$${taxAmount.toFixed(2)}</span>
-          </div>
-          <div class="totals-row total-due">
-            <span>Total Due</span>
-            <span>$${total.toFixed(2)}</span>
+        <!-- Pinned Bottom Controls (Always Visible & Accessible on All Heights) -->
+        <div class="cart-footer-pinned">
+          <div class="quick-cash-bar" style="padding:0; background:none; border:none;">
+            <div class="quick-cash-title" style="margin-bottom:0.25rem;">Quick Cash Tender (1-Thumb Tap)</div>
+            <div class="quick-cash-buttons">
+              <button class="btn-cash-quick" onclick="quickCashCheckout(10)" ${total > 10 || state.cart.length === 0 ? 'disabled' : ''}>$10</button>
+              <button class="btn-cash-quick" onclick="quickCashCheckout(20)" ${total > 20 || state.cart.length === 0 ? 'disabled' : ''}>$20</button>
+              <button class="btn-cash-quick" onclick="quickCashCheckout(50)" ${total > 50 || state.cart.length === 0 ? 'disabled' : ''}>$50</button>
+              <button class="btn-cash-quick" onclick="quickCashCheckout(${total})" ${state.cart.length === 0 ? 'disabled' : ''}>Exact</button>
+            </div>
           </div>
 
-          <div class="checkout-actions-grid">
+          <div style="display:flex; flex-direction:column; gap:0.25rem; margin-top:0.25rem;">
+            <div class="totals-row">
+              <span>Subtotal</span>
+              <span style="font-family:var(--font-mono); font-weight:700;">$${subtotal.toFixed(2)}</span>
+            </div>
+            <div class="totals-row">
+              <span>Sales Tax (8%)</span>
+              <span style="font-family:var(--font-mono); font-weight:700;">$${taxAmount.toFixed(2)}</span>
+            </div>
+            <div class="totals-row total-due" style="font-size:1.5rem; padding-top:0.25rem;">
+              <span>Total Due</span>
+              <span>$${total.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <div class="checkout-actions-grid" style="margin-top:0.25rem;">
             <button class="btn-primary btn-checkout" onclick="checkoutOrder('CARD')" ${state.cart.length === 0 ? 'disabled' : ''}>
               💳 Charge Card
             </button>
