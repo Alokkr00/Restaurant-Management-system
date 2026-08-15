@@ -686,7 +686,7 @@ function renderCashManagementWorkspace() {
     </div>
 
     <!-- Drawer Summary Cards -->
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
+    <div class="cash-summary-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:1rem; margin-bottom:1.5rem;">
       <div class="card">
         <div style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Opening Float Bank</div>
         <div style="font-family:var(--font-mono); font-size:1.6rem; font-weight:800; color:#ffffff; margin-top:0.25rem;">$${state.drawerSession.startingBankUSD.toFixed(2)}</div>
@@ -731,6 +731,78 @@ function renderCashManagementWorkspace() {
                 <td><strong>${a.amount > 0 ? '+' : ''}$${Math.abs(a.amount).toFixed(2)}</strong></td>
                 <td>${a.witness}</td>
                 <td>${a.notes}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// 5. PO RECEIVING WORKSPACE
+function renderPOReceivingWorkspace() {
+  return `
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Purchase Orders & GRN Receiving</h2>
+        <p class="section-subtitle">Vendor Invoicing &bull; Stock Replenishment</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn-primary btn-emerald">Create PO</button>
+        <button class="btn-primary btn-slate">Receive GRN</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:1.5rem;">
+      <h3 style="font-size:1.1rem; font-weight:800; margin-bottom:1rem;">Approved Suppliers</h3>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Supplier</th>
+              <th>Category</th>
+              <th>Contact</th>
+              <th>Terms</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${state.suppliers.map(s => `
+              <tr>
+                <td><strong>${s.name}</strong></td>
+                <td>${s.category}</td>
+                <td>${s.contact}</td>
+                <td>${s.terms}</td>
+                <td><span class="badge badge-online">ACTIVE</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="font-size:1.1rem; font-weight:800; margin-bottom:1rem;">Recent Purchase Orders</h3>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>PO Number</th>
+              <th>Supplier</th>
+              <th>Expected Date</th>
+              <th>Total Value</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${state.purchaseOrders.map(po => `
+              <tr>
+                <td><code>${po.id}</code></td>
+                <td><strong>${po.supplier}</strong></td>
+                <td>${po.expectedDelivery}</td>
+                <td style="font-family:var(--font-mono);">$${po.totalValue.toFixed(2)}</td>
+                <td><span class="badge ${po.status === 'RECEIVED' ? 'badge-online' : po.status === 'OVERDUE' ? 'badge-danger' : 'badge-warning'}">${po.status}</span></td>
               </tr>
             `).join('')}
           </tbody>
@@ -819,6 +891,29 @@ function renderInventoryPrepWorkspace() {
         </table>
       </div>
     </div>
+
+    <!-- Recipe Depletion BOM Cards -->
+    ${state.recipes && state.recipes.length > 0 ? `
+    <div class="card" style="margin-top:1.5rem;">
+      <h3 style="font-size:1.1rem; font-weight:800; margin-bottom:1rem;">Recipe Depletion BOM (Bill of Materials)</h3>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:1rem;">
+        ${state.recipes.map(recipe => `
+          <div class="card" style="background:var(--bg-surface); border:1px solid var(--border-subtle);">
+            <div style="font-weight:800; color:#ffffff; font-size:1.05rem;">${recipe.name}</div>
+            <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">Yield: ${recipe.yield}</div>
+            <ul style="list-style:none; padding:0; margin:0; font-size:0.85rem;">
+              ${recipe.ingredients.map(ing => `
+                <li style="display:flex; justify-content:space-between; margin-bottom:0.25rem; border-bottom:1px dashed var(--border-subtle); padding-bottom:0.2rem;">
+                  <span>${ing.item}</span>
+                  <strong style="color:var(--accent-blue);">${ing.qty}</strong>
+                </li>
+              `).join('')}
+            </ul>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    ` : ''}
   `;
 }
 
@@ -862,7 +957,7 @@ function renderLaborShiftsWorkspace() {
                 <td>${e.hours} hrs</td>
                 <td><span class="badge badge-online">COMPLIANT</span></td>
                 <td>${e.role === 'Shift Lead' ? '<span style="color:#94a3b8; font-size:0.8rem;">Banned (FLSA §3m)</span>' : '<span style="color:#34d399; font-weight:700;">Eligible Share</span>'}</td>
-                <td><button class="btn-primary ${e.status === 'CLOCKED_IN' ? 'btn-rose' : 'btn-slate'}" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="toggleEmployeeClock('${e.id}', true)">${e.status === 'CLOCKED_IN' ? 'Clock Out' : 'Clock In'}</button></td>
+                <td><button class="btn-primary ${e.status === 'CLOCKED_IN' ? 'btn-rose' : 'btn-slate'}" style="padding:0.5rem 1rem; font-size:0.85rem; min-height:48px; min-width:120px;" onclick="toggleEmployeeClock('${e.id}', true)">${e.status === 'CLOCKED_IN' ? 'Clock Out' : 'Clock In'}</button></td>
               </tr>
             `).join('')}
           </tbody>
@@ -935,13 +1030,13 @@ function renderFinancialsWorkspace() {
 
     <div class="card" style="margin-bottom:1.5rem;">
       <h3 style="font-size:1.1rem; font-weight:800; margin-bottom:1rem;">KPI Summary</h3>
-      <div style="display:flex; gap:2rem; flex-wrap:wrap;">
-        <div><div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Gross Sales</div><div style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800;">$${state.kpis.grossSalesUSD.toFixed(2)}</div></div>
-        <div><div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Net Sales</div><div style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800; color:var(--accent-blue);">$${state.kpis.netSalesUSD.toFixed(2)}</div></div>
-        <div><div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Tax Collected</div><div style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800;">$${state.kpis.taxCollectedUSD.toFixed(2)}</div></div>
-        <div><div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Food Cost</div><div style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800; color:#34d399;">${state.kpis.foodCostPct}%</div></div>
-        <div><div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Labor Cost</div><div style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800; color:#34d399;">${state.kpis.laborCostPct}%</div></div>
-        <div><div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Prime Cost</div><div style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800; color:#f59e0b;">${state.kpis.primeCostPct}%</div></div>
+      <div class="cash-summary-grid">
+        <div class="card"><div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Gross Sales</div><div style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800;">$${state.kpis.grossSalesUSD.toFixed(2)}</div></div>
+        <div class="card"><div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Net Sales</div><div style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800; color:var(--accent-blue);">$${state.kpis.netSalesUSD.toFixed(2)}</div></div>
+        <div class="card"><div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Tax Collected</div><div style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800;">$${state.kpis.taxCollectedUSD.toFixed(2)}</div></div>
+        <div class="card"><div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Food Cost</div><div style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800; color:#34d399;">${state.kpis.foodCostPct}%</div></div>
+        <div class="card"><div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Labor Cost</div><div style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800; color:#34d399;">${state.kpis.laborCostPct}%</div></div>
+        <div class="card"><div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Prime Cost</div><div style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800; color:#f59e0b;">${state.kpis.primeCostPct}%</div></div>
       </div>
     </div>
 
