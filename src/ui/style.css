@@ -327,9 +327,10 @@ body {
 
 /* View Container */
 .view-container {
-  max-width: 1600px;
-  margin: 0 auto;
-  padding: var(--space-md) var(--space-md);
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: var(--space-sm) var(--space-lg);
 }
 
 /* Section Header */
@@ -339,9 +340,10 @@ body {
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-sm);
-  margin-bottom: var(--space-md);
-  padding-bottom: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  padding-bottom: var(--space-xs);
   border-bottom: 1px solid var(--border-subtle);
+  width: 100%;
 }
 
 .section-title {
@@ -444,16 +446,23 @@ body {
 }
 
 /* ==========================================================================
-   1. POINT OF SALE (POS) REGISTER LAYOUT (GOLDEN SPLIT: 1.618 : 1)
+   1. POINT OF SALE (POS) REGISTER LAYOUT (FLUID FULL-SCREEN DUAL COLUMN)
    ========================================================================== */
 .pos-layout {
   display: grid;
-  grid-template-columns: 1.618fr 1fr; /* Golden harmonic ratio split */
+  grid-template-columns: minmax(0, 1fr) 400px;
   gap: var(--space-md);
   align-items: start;
+  width: 100%;
 }
 
-@media (max-width: 1200px) {
+@media (min-width: 1600px) {
+  .pos-layout {
+    grid-template-columns: minmax(0, 1fr) 440px;
+  }
+}
+
+@media (max-width: 900px) {
   .pos-layout {
     grid-template-columns: 1fr;
   }
@@ -468,6 +477,7 @@ body {
   margin-bottom: var(--space-sm);
   -ms-overflow-style: none;
   scrollbar-width: none;
+  flex-wrap: wrap;
 }
 
 .category-chips-rail::-webkit-scrollbar {
@@ -481,7 +491,7 @@ body {
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 0.95rem;
-  padding: 0.75rem 1.35rem;
+  padding: 0.65rem 1.25rem;
   border-radius: 9999px;
   cursor: pointer;
   white-space: nowrap;
@@ -505,8 +515,9 @@ body {
 /* Menu Grid */
 .menu-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
   gap: var(--space-sm);
+  width: 100%;
 }
 
 /* POS Card (Touchscreen Tile with Dual Touch Target) */
