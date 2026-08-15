@@ -112,6 +112,9 @@ async function runCloudSyncWorkerCycle(): Promise<{ flushedCount: number; remain
     lastSyncTimestamp = new Date().toISOString();
     syncCycleCount++;
 
+    // Prune synced POS transactions older than 30 days
+    db.prepare(`DELETE FROM pos_transactions WHERE synced = 1 AND timestamp < datetime('now', '-30 days')`).run();
+
     // Broadcast sync status update to all connected POS / KDS clients
     const pendingCount = (countPendingSyncStmt.get() as any).count;
     wss.clients.forEach((client) => {

@@ -38,7 +38,10 @@ export class TransactionalOutboxSyncEngine {
   public start(intervalMs = 5000): void {
     if (this.isRunning) return;
     this.isRunning = true;
-    this.timer = setInterval(() => this.flushPendingBatch(), intervalMs);
+    this.timer = setInterval(() => {
+      this.flushPendingBatch();
+      this.pruneOutbox();
+    }, intervalMs);
   }
 
   public stop(): void {
@@ -46,6 +49,17 @@ export class TransactionalOutboxSyncEngine {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
+    }
+  }
+
+  /**
+   * Prunes acknowledged events older than 30 days to bound local storage.
+   */
+  public pruneOutbox(): void {
+    try {
+      this.db.prepare("DELETE FROM sync_outbox WHERE delivered_at IS NOT NULL AND created_at < datetime('now', '-30 days')").run();
+    } catch (err) {
+      console.error('Failed to prune outbox', err);
     }
   }
 

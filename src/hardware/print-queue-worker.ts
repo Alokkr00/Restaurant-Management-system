@@ -45,7 +45,10 @@ export class DurablePrintQueueWorker {
   public start(pollIntervalMs = 1000): void {
     if (this.isRunning) return;
     this.isRunning = true;
-    this.timer = setInterval(() => this.processNextBatch(), pollIntervalMs);
+    this.timer = setInterval(() => {
+      this.processNextBatch();
+      this.pruneQueue();
+    }, pollIntervalMs);
   }
 
   public stop(): void {
@@ -54,6 +57,15 @@ export class DurablePrintQueueWorker {
       clearInterval(this.timer);
       this.timer = null;
     }
+  }
+
+  /**
+   * Bound memory/disk by pruning old print jobs
+   */
+  public pruneQueue(daysToKeep = 7): void {
+    try {
+      this.db.prepare(`DELETE FROM print_jobs WHERE status IN ('COMPLETED', 'FAILED') AND created_at < datetime('now', '-${daysToKeep} days')`).run();
+    } catch (e) {}
   }
 
   /**

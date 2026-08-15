@@ -123,46 +123,57 @@ const state = {
   recipes: [],
 };
 
+// Generic apiFetch helper to unify fetch calls, timeouts, and error handling
+async function apiFetch(endpoint, options = {}) {
+  const timeoutMs = options.timeout || 8000;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await apiFetch(`${EDGE_SERVER_URL}${endpoint}`, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers || {})
+      }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } catch (err) {
+    console.error(`[apiFetch] failed for ${endpoint}:`, err);
+    throw err;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 // Master Data Synchronization with Store Edge Node
 async function refreshAllData() {
   try {
-    const res = await fetch(`${EDGE_SERVER_URL}/health`);
-    if (res.ok) state.apiConnected = true;
+    await apiFetch('/health', { method: 'GET' });
+    state.apiConnected = true;
   } catch (err) {
     state.apiConnected = false;
   }
 
-  // 1. Fetch Menu Catalog
   try {
-    const menuRes = await fetch(`${EDGE_SERVER_URL}/api/menu`);
-    const menuData = await menuRes.json();
-    if (menuData.success && menuData.menuItems) {
-      state.menuItems = menuData.menuItems;
-    }
+    const menuData = await apiFetch('/api/menu');
+    if (menuData.success && menuData.menuItems) state.menuItems = menuData.menuItems;
   } catch (err) {}
 
-  // 2. Fetch Table Floor Plan
   try {
-    const tblRes = await fetch(`${EDGE_SERVER_URL}/api/tables`);
-    const tblData = await tblRes.json();
-    if (tblData.success && tblData.tables) {
-      state.tables = tblData.tables;
-    }
+    const tblData = await apiFetch('/api/tables');
+    if (tblData.success && tblData.tables) state.tables = tblData.tables;
   } catch (err) {}
 
-  // 3. Fetch Active KDS Tickets
   try {
-    const kdsRes = await fetch(`${EDGE_SERVER_URL}/api/kds/tickets`);
-    const kdsData = await kdsRes.json();
-    if (kdsData.success && kdsData.tickets) {
-      state.kdsTickets = kdsData.tickets;
-    }
+    const kdsData = await apiFetch('/api/kds/tickets');
+    if (kdsData.success && kdsData.tickets) state.kdsTickets = kdsData.tickets;
   } catch (err) {}
 
-  // 4. Fetch Shift Drawer State
   try {
-    const drawerRes = await fetch(`${EDGE_SERVER_URL}/api/cash/drawer`);
-    const drawerData = await drawerRes.json();
+    const drawerData = await apiFetch('/api/cash/drawer');
     if (drawerData.success && drawerData.drawerSession) {
       state.drawerSession = {
         sessionId: drawerData.drawerSession.sessionId,
@@ -177,43 +188,33 @@ async function refreshAllData() {
     }
   } catch (err) {}
 
-  // 5. Fetch Inventory POs, Suppliers & Stock
   try {
-    const poRes = await fetch(`${EDGE_SERVER_URL}/api/inventory/pos`);
-    const poData = await poRes.json();
+    const poData = await apiFetch('/api/inventory/pos');
     if (poData.success && poData.purchaseOrders) state.purchaseOrders = poData.purchaseOrders;
 
-    const supRes = await fetch(`${EDGE_SERVER_URL}/api/inventory/suppliers`);
-    const supData = await supRes.json();
+    const supData = await apiFetch('/api/inventory/suppliers');
     if (supData.success && supData.suppliers) state.suppliers = supData.suppliers;
 
-    const stkRes = await fetch(`${EDGE_SERVER_URL}/api/inventory/stock`);
-    const stkData = await stkRes.json();
+    const stkData = await apiFetch('/api/inventory/stock');
     if (stkData.success && stkData.stockLevels) state.stockLevels = stkData.stockLevels;
 
-    const wstRes = await fetch(`${EDGE_SERVER_URL}/api/inventory/waste`);
-    const wstData = await wstRes.json();
+    const wstData = await apiFetch('/api/inventory/waste');
     if (wstData.success && wstData.spoilageLogs) state.spoilageLogs = wstData.spoilageLogs;
 
-    const rcpRes = await fetch(`${EDGE_SERVER_URL}/api/inventory/recipes`);
-    const rcpData = await rcpRes.json();
+    const rcpData = await apiFetch('/api/inventory/recipes');
     if (rcpData.success && rcpData.recipes) state.recipes = rcpData.recipes;
   } catch (err) {}
 
-  // 6. Fetch Labor Roster & Tip Pool
   try {
-    const lbrRes = await fetch(`${EDGE_SERVER_URL}/api/labor/shifts`);
-    const lbrData = await lbrRes.json();
+    const lbrData = await apiFetch('/api/labor/shifts');
     if (lbrData.success && lbrData.employees) {
       state.employees = lbrData.employees;
       state.tipPoolTotal = lbrData.tipPoolTotalUSD || 450.0;
     }
   } catch (err) {}
 
-  // 7. Fetch Financials & GL
   try {
-    const finRes = await fetch(`${EDGE_SERVER_URL}/api/financials/ledger`);
-    const finData = await finRes.json();
+    const finData = await apiFetch('/api/financials/ledger');
     if (finData.success) {
       state.journalEntries = finData.journalEntries || [];
       state.kpis = finData.kpis || state.kpis;
@@ -223,15 +224,21 @@ async function refreshAllData() {
   renderApp();
 }
 
+let wsConnection = null;
+
 // Real-Time LAN WebSocket Listener
 function initWebSocket() {
+  if (wsConnection) {
+    wsConnection.onclose = null;
+    wsConnection.close();
+  }
   try {
-    const ws = new WebSocket(EDGE_WS_URL);
-    ws.onopen = () => {
+    wsConnection = new WebSocket(EDGE_WS_URL);
+    wsConnection.onopen = () => {
       state.wsConnected = true;
       renderApp();
     };
-    ws.onmessage = (event) => {
+    wsConnection.onmessage = (event) => {
       const data = JSON.parse(event.data);
       if (data.type === 'KDS_NEW_TICKET') {
         state.kdsTickets.unshift({
@@ -276,8 +283,9 @@ function initWebSocket() {
         renderApp();
       }
     };
-    ws.onclose = () => {
+    wsConnection.onclose = () => {
       state.wsConnected = false;
+      wsConnection = null;
       setTimeout(initWebSocket, 3000);
     };
   } catch (err) {}
@@ -1274,7 +1282,7 @@ window.checkoutOrder = async function(tenderType) {
   };
 
   try {
-    const res = await fetch(`${EDGE_SERVER_URL}/api/pos/checkout`, {
+    const res = await apiFetch(`${EDGE_SERVER_URL}/api/pos/checkout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -1876,7 +1884,7 @@ function renderModals() {
 window.toggleTrainingMode = async function() {
   state.trainingModeActive = !state.trainingModeActive;
   try {
-    await fetch(`${EDGE_SERVER_URL}/api/v1/training-mode`, {
+    await apiFetch(`${EDGE_SERVER_URL}/api/v1/training-mode`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled: state.trainingModeActive })
@@ -1895,8 +1903,7 @@ window.toggleTrainingMode = async function() {
 
 window.downloadSupportBundle = async function() {
   try {
-    const res = await fetch(`${EDGE_SERVER_URL}/api/v1/support/bundle`);
-    const data = await res.json();
+    const data = await apiFetch(`${EDGE_SERVER_URL}/api/v1/support/bundle`);
     if (data.success) {
       const blob = new Blob([JSON.stringify(data.supportBundle, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -1924,7 +1931,7 @@ window.submitDayEndReconciliation = async function(e) {
   const floatPaise = parseFloat(document.getElementById('reconFloat').value || 0) * 100;
 
   try {
-    const res = await fetch(`${EDGE_SERVER_URL}/api/v1/reconciliation/z-report`, {
+    const res = await apiFetch(`${EDGE_SERVER_URL}/api/v1/reconciliation/z-report`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1961,7 +1968,7 @@ window.submitSeatTable = async function(e) {
   const tableId = state.selectedTable?.tableId;
 
   try {
-    const res = await fetch(`${EDGE_SERVER_URL}/api/tables/seat`, {
+    const res = await apiFetch(`${EDGE_SERVER_URL}/api/tables/seat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tableId, covers, serverName })
@@ -1991,7 +1998,7 @@ window.fireCourseForTable = async function(tableId) {
   if (!table) return;
 
   try {
-    await fetch(`${EDGE_SERVER_URL}/api/tables/fire`, {
+    await apiFetch(`${EDGE_SERVER_URL}/api/tables/fire`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tableId, course: 'MAIN_COURSE' })
@@ -2012,7 +2019,7 @@ window.closeTableCheckout = async function(tableId) {
   if (!table) return;
 
   try {
-    await fetch(`${EDGE_SERVER_URL}/api/tables/close`, {
+    await apiFetch(`${EDGE_SERVER_URL}/api/tables/close`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tableId })
@@ -2035,8 +2042,7 @@ window.closeTableCheckout = async function(tableId) {
 window.bumpKDSTicket = async function(ticketId) {
   const tId = typeof ticketId === 'string' ? ticketId : (state.kdsTickets[ticketId]?.id || 'TKT-9912');
   try {
-    const res = await fetch(`${EDGE_SERVER_URL}/api/kds/tickets/${tId}/bump`, { method: 'POST' });
-    const data = await res.json();
+    const data = await apiFetch(`${EDGE_SERVER_URL}/api/kds/tickets/${tId}/bump`, { method: 'POST' });
     if (data.success) {
       state.kdsTickets = data.tickets;
       showToast({ title: 'Ticket Bumped', message: `Ticket #${tId} transitioned to next kitchen stage.`, type: 'info' });
@@ -2056,7 +2062,7 @@ window.submitCreatePO = async function(e) {
   const expectedDate = document.getElementById('poDeliveryDateInput').value;
 
   try {
-    const res = await fetch(`${EDGE_SERVER_URL}/api/inventory/pos`, {
+    const res = await apiFetch(`${EDGE_SERVER_URL}/api/inventory/pos`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2095,7 +2101,7 @@ window.submitReceiveGRN = async function(e) {
   const receivedBy = document.getElementById('grnStaffInput').value || 'Warehouse Staff Lead';
 
   try {
-    const res = await fetch(`${EDGE_SERVER_URL}/api/inventory/pos/receive`, {
+    const res = await apiFetch(`${EDGE_SERVER_URL}/api/inventory/pos/receive`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2129,7 +2135,7 @@ window.submitStockTake = async function(e) {
   const flour = parseFloat(document.getElementById('countFlour').value || '48.0');
 
   try {
-    const res = await fetch(`${EDGE_SERVER_URL}/api/inventory/stock-take`, {
+    const res = await apiFetch(`${EDGE_SERVER_URL}/api/inventory/stock-take`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2159,7 +2165,7 @@ window.submitSafeDrop = async function(e) {
   const witness = document.getElementById('dropWitnessInput').value || 'Michael Smith (Manager)';
 
   try {
-    const res = await fetch(`${EDGE_SERVER_URL}/api/cash/drop`, {
+    const res = await apiFetch(`${EDGE_SERVER_URL}/api/cash/drop`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ amount, envelopeId, witnessName: witness })
@@ -2192,7 +2198,7 @@ window.submitWasteLog = async function(e) {
   const reason = document.getElementById('wasteReasonSelect').value;
 
   try {
-    const res = await fetch(`${EDGE_SERVER_URL}/api/inventory/waste`, {
+    const res = await apiFetch(`${EDGE_SERVER_URL}/api/inventory/waste`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ item, qty, reason, cost: '$8.50', loggedBy: 'Kitchen Lead' })
@@ -2228,7 +2234,7 @@ window.submitBlindZReport = function(e) {
 
 window.toggleEmployeeClock = async function(empId, breakAttested) {
   try {
-    const res = await fetch(`${EDGE_SERVER_URL}/api/labor/clock`, {
+    const res = await apiFetch(`${EDGE_SERVER_URL}/api/labor/clock`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ employeeId: empId, attested: breakAttested })
@@ -2257,7 +2263,7 @@ window.toggleEmployeeClock = async function(empId, breakAttested) {
 
 window.toggle86 = async function(productId, isUnavailable) {
   try {
-    const res = await fetch(`${EDGE_SERVER_URL}/api/v1/menu/86-toggle`, {
+    const res = await apiFetch(`${EDGE_SERVER_URL}/api/v1/menu/86-toggle`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ productId, isUnavailable: !isUnavailable })
@@ -2312,7 +2318,7 @@ window.saveNewMenuItem = async function(e) {
   const image = state.newMenuItemImage || '/truffle_pasta.jpg';
 
   try {
-    const res = await fetch(`${EDGE_SERVER_URL}/api/menu/items`, {
+    const res = await apiFetch(`${EDGE_SERVER_URL}/api/menu/items`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, category, sku, price, image, allergens: ['DAIRY'] })
@@ -2356,18 +2362,25 @@ window.saveNewMenuItem = async function(e) {
 };
 
 setInterval(() => {
-  state.kdsTickets.forEach(t => {
-    t.elapsedSeconds = (t.elapsedSeconds || 0) + 1;
-    if (t.elapsedSeconds >= 60) {
-      t.elapsedSeconds = 0;
-      t.elapsedMinutes = (t.elapsedMinutes || 0) + 1;
+  if (state.kdsTickets.length > 0) {
+    let shouldRender = false;
+    state.kdsTickets.forEach(t => {
+      t.elapsedSeconds = (t.elapsedSeconds || 0) + 1;
+      if (t.elapsedSeconds >= 60) {
+        t.elapsedSeconds = 0;
+        t.elapsedMinutes = (t.elapsedMinutes || 0) + 1;
+        shouldRender = true;
+      }
+      if (t.elapsedMinutes >= 10 && t.status === 'IN_PREP') {
+        t.status = 'LATE';
+        shouldRender = true;
+      }
+    });
+    // We only need to render every second if we are actively viewing KDS, 
+    // or if a minute boundary / status change happened while on KDS.
+    if (state.activeModule === 'kds') {
+      renderApp();
     }
-    if (t.elapsedMinutes >= 10 && t.status === 'IN_PREP') {
-      t.status = 'LATE';
-    }
-  });
-  if (state.activeModule === 'kds') {
-    renderApp();
   }
 }, 1000);
 
