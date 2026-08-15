@@ -724,27 +724,15 @@ function renderCashManagementWorkspace() {
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td>08:00 AM</td>
-              <td><span class="badge badge-online">OPENING BANK FLOAT</span></td>
-              <td><strong>+$200.00</strong></td>
-              <td>Sarah Jenkins (Cashier)</td>
-              <td>Initial float bank verified</td>
-            </tr>
-            <tr>
-              <td>01:15 PM</td>
-              <td><span class="badge badge-warning">MID-SHIFT SAFE DROP</span></td>
-              <td><strong>-$100.00</strong></td>
-              <td>Michael Smith (Manager)</td>
-              <td>Envelope #ENV-9914 dropped to safe</td>
-            </tr>
-            <tr>
-              <td>02:30 PM</td>
-              <td><span class="badge badge-danger">PETTY CASH PAYOUT</span></td>
-              <td><strong>-$20.00</strong></td>
-              <td>Michael Smith (Manager)</td>
-              <td>Window Cleaning Service Expense</td>
-            </tr>
+            ${state.drawerSession.activityLedger.map(a => `
+              <tr>
+                <td>${a.timestamp}</td>
+                <td><span class="badge ${a.activityType === 'OPENING' ? 'badge-online' : a.activityType === 'SAFE DROP' ? 'badge-warning' : 'badge-danger'}">${a.activityType}</span></td>
+                <td><strong>${a.amount > 0 ? '+' : ''}$${Math.abs(a.amount).toFixed(2)}</strong></td>
+                <td>${a.witness}</td>
+                <td>${a.notes}</td>
+              </tr>
+            `).join('')}
           </tbody>
         </table>
       </div>
@@ -861,6 +849,7 @@ function renderLaborShiftsWorkspace() {
               <th>Hours</th>
               <th>Break Attestation</th>
               <th>FLSA Tip Share</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -873,6 +862,7 @@ function renderLaborShiftsWorkspace() {
                 <td>${e.hours} hrs</td>
                 <td><span class="badge badge-online">COMPLIANT</span></td>
                 <td>${e.role === 'Shift Lead' ? '<span style="color:#94a3b8; font-size:0.8rem;">Banned (FLSA §3m)</span>' : '<span style="color:#34d399; font-weight:700;">Eligible Share</span>'}</td>
+                <td><button class="btn-primary ${e.status === 'CLOCKED_IN' ? 'btn-rose' : 'btn-slate'}" style="padding:0.25rem 0.5rem; font-size:0.75rem;" onclick="toggleEmployeeClock('${e.id}', true)">${e.status === 'CLOCKED_IN' ? 'Clock Out' : 'Clock In'}</button></td>
               </tr>
             `).join('')}
           </tbody>
@@ -907,6 +897,7 @@ function renderMenuCatalogWorkspace() {
               <th>Base Price</th>
               <th>Allergens</th>
               <th>Brand Lock Policy</th>
+              <th>86 Status</th>
             </tr>
           </thead>
           <tbody>
@@ -918,6 +909,7 @@ function renderMenuCatalogWorkspace() {
                 <td style="font-family:var(--font-mono); font-weight:700;">$${item.basePrice.toFixed(2)}</td>
                 <td>${item.allergens.join(', ') || 'None'}</td>
                 <td><span class="badge ${item.isBrandLocked ? 'badge-locked' : 'badge-online'}">${item.isBrandLocked ? 'HQ BRAND LOCKED' : 'STORE OVERRIDABLE'}</span></td>
+                <td><button class="badge ${item.isAvailable !== false ? 'badge-online' : 'badge-danger'}" style="border:none; cursor:pointer;" onclick="toggle86('${item.id}', ${item.isAvailable !== false})">${item.isAvailable !== false ? 'AVAILABLE' : 'OUT OF STOCK'}</button></td>
               </tr>
             `).join('')}
           </tbody>
@@ -941,62 +933,43 @@ function renderFinancialsWorkspace() {
       </div>
     </div>
 
+    <div class="card" style="margin-bottom:1.5rem;">
+      <h3 style="font-size:1.1rem; font-weight:800; margin-bottom:1rem;">KPI Summary</h3>
+      <div style="display:flex; gap:2rem; flex-wrap:wrap;">
+        <div><div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Gross Sales</div><div style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800;">$${state.kpis.grossSalesUSD.toFixed(2)}</div></div>
+        <div><div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Net Sales</div><div style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800; color:var(--accent-blue);">$${state.kpis.netSalesUSD.toFixed(2)}</div></div>
+        <div><div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Tax Collected</div><div style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800;">$${state.kpis.taxCollectedUSD.toFixed(2)}</div></div>
+        <div><div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Food Cost</div><div style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800; color:#34d399;">${state.kpis.foodCostPct}%</div></div>
+        <div><div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Labor Cost</div><div style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800; color:#34d399;">${state.kpis.laborCostPct}%</div></div>
+        <div><div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase;">Prime Cost</div><div style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800; color:#f59e0b;">${state.kpis.primeCostPct}%</div></div>
+      </div>
+    </div>
+
     <div class="card">
       <h3 style="font-size:1.1rem; font-weight:800; margin-bottom:1rem;">NetSuite General Ledger Accounts (Debits === Credits Guarantee)</h3>
       <div class="table-container">
         <table class="data-table">
           <thead>
             <tr>
-              <th>Account #</th>
-              <th>Account Description</th>
+              <th>ID</th>
+              <th>Date</th>
+              <th>Account</th>
+              <th>Memo</th>
               <th>Debit ($)</th>
               <th>Credit ($)</th>
-              <th>Status</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td><code>1010</code></td>
-              <td>Cash on Hand (Store Float + Cash Receipts)</td>
-              <td style="font-family:var(--font-mono); font-weight:700;">$550.00</td>
-              <td>$0.00</td>
-              <td><span class="badge badge-online">BALANCED</span></td>
-            </tr>
-            <tr>
-              <td><code>1020</code></td>
-              <td>Merchant Card Settlement Clearing</td>
-              <td style="font-family:var(--font-mono); font-weight:700;">$1,840.00</td>
-              <td>$0.00</td>
-              <td><span class="badge badge-online">BALANCED</span></td>
-            </tr>
-            <tr>
-              <td><code>1030</code></td>
-              <td>3rd-Party Delivery AR (DoorDash / UberEats)</td>
-              <td style="font-family:var(--font-mono); font-weight:700;">$620.00</td>
-              <td>$0.00</td>
-              <td><span class="badge badge-online">BALANCED</span></td>
-            </tr>
-            <tr>
-              <td><code>2010</code></td>
-              <td>Sales Tax Payable</td>
-              <td>$0.00</td>
-              <td style="font-family:var(--font-mono); font-weight:700;">$240.80</td>
-              <td><span class="badge badge-online">BALANCED</span></td>
-            </tr>
-            <tr>
-              <td><code>2020</code></td>
-              <td>Accrued Tip Liability (Owed to Staff)</td>
-              <td>$0.00</td>
-              <td style="font-family:var(--font-mono); font-weight:700;">$450.00</td>
-              <td><span class="badge badge-online">BALANCED</span></td>
-            </tr>
-            <tr>
-              <td><code>4010</code></td>
-              <td>Food & Beverage Sales Revenue</td>
-              <td>$0.00</td>
-              <td style="font-family:var(--font-mono); font-weight:700;">$2,319.20</td>
-              <td><span class="badge badge-online">BALANCED</span></td>
-            </tr>
+            ${state.journalEntries.map(entry => `
+              <tr>
+                <td><code>${entry.id}</code></td>
+                <td>${entry.date}</td>
+                <td>${entry.account}</td>
+                <td>${entry.memo}</td>
+                <td style="font-family:var(--font-mono); font-weight:700;">$${entry.debit.toFixed(2)}</td>
+                <td style="font-family:var(--font-mono); font-weight:700;">$${entry.credit.toFixed(2)}</td>
+              </tr>
+            `).join('')}
           </tbody>
         </table>
       </div>
@@ -1086,33 +1059,7 @@ window.openSeatTableModal = function(tableId) {
   openModal('seat_table');
 };
 
-window.fireCourseForTable = function(tableId) {
-  const table = state.tables.find(t => t.tableId === tableId);
-  if (!table) return;
-  table.status = 'SERVED';
-  showToast({ 
-    title: 'KDS Course Fired', 
-    message: `Active course for ${table.label} dispatched over LAN WebSocket to Hotline KDS.`, 
-    type: 'success' 
-  });
-  renderApp();
-};
 
-window.closeTableCheckout = function(tableId) {
-  const table = state.tables.find(t => t.tableId === tableId);
-  if (!table) return;
-  table.status = 'VACANT';
-  delete table.openTicketId;
-  delete table.covers;
-  delete table.serverName;
-  delete table.seatedAt;
-  showToast({ 
-    title: 'Table Settled & Closed', 
-    message: `${table.label} bill settled via Cash. Table reset to VACANT.`, 
-    type: 'success' 
-  });
-  renderApp();
-};
 
 window.openReceiveGRNModal = function(poId) {
   const po = state.purchaseOrders.find(p => p.poId === poId);
@@ -1250,10 +1197,7 @@ window.checkoutOrder = async function(tenderType) {
   renderApp();
 };
 
-window.bumpKDSTicket = function(idx) {
-  state.kdsTickets.splice(idx, 1);
-  renderApp();
-};
+
 
 window.testPrintESCPOSTicket = function() {
   showToast({
@@ -2304,6 +2248,22 @@ window.saveNewMenuItem = async function(e) {
 
   closeModal();
 };
+
+setInterval(() => {
+  state.kdsTickets.forEach(t => {
+    t.elapsedSeconds = (t.elapsedSeconds || 0) + 1;
+    if (t.elapsedSeconds >= 60) {
+      t.elapsedSeconds = 0;
+      t.elapsedMinutes = (t.elapsedMinutes || 0) + 1;
+    }
+    if (t.elapsedMinutes >= 10 && t.status === 'IN_PREP') {
+      t.status = 'LATE';
+    }
+  });
+  if (state.activeModule === 'kds') {
+    renderApp();
+  }
+}, 1000);
 
 // Start
 initBackendConnection();
