@@ -16,6 +16,10 @@ import { DurablePrintQueueWorker } from '../hardware/print-queue-worker.js';
 import { TransactionalOutboxSyncEngine } from '../shared/outbox-sync-engine.js';
 import { CertifiedPaymentGateway } from '../fintech/payment-gateway.js';
 import { StoreAuthService } from '../security/store-auth.js';
+import { DayEndReconciliationEngine } from '../fintech/reconciliation-engine.js';
+import { SupportBundleCollector } from '../shared/support-bundle.js';
+import { HardwareRegistry } from '../hardware/hardware-registry.js';
+import { MenuStructureEngine } from '../pos/menu-structure-engine.js';
 
 const app = express();
 app.use(cors());
@@ -30,6 +34,7 @@ const recipeEngine = new InventoryRecipeEngine();
 const authService = new JWTAuthService();
 const floorPlanEngine = new TableFloorPlanEngine();
 const poEngine = new PurchaseOrderEngine();
+let isTrainingModeActive = false;
 
 // Initialize Physical SQLite Engine in Write-Ahead Logging (WAL) Mode
 const dbPath = path.resolve(process.cwd(), 'store-edge.db');
@@ -47,6 +52,11 @@ const orderStateMachine = new OrderStateMachine(db);
 const storeAuthService = new StoreAuthService(db);
 const paymentGateway = new CertifiedPaymentGateway(db);
 const outboxSyncEngine = new TransactionalOutboxSyncEngine(db);
+const reconciliationEngine = new DayEndReconciliationEngine(db);
+const supportBundleCollector = new SupportBundleCollector(db);
+const hardwareRegistry = new HardwareRegistry();
+const menuStructureEngine = new MenuStructureEngine();
+
 const printQueueWorker = new DurablePrintQueueWorker(db, [
   { printerId: 'printer-hotline-primary', name: 'Kitchen Hotline Thermal', host: '192.168.1.150', port: 9100, timeoutMs: 1500, fallbackPrinterId: 'printer-expo-backup' },
   { printerId: 'printer-receipt-primary', name: 'Front Counter Receipt Thermal', host: '192.168.1.152', port: 9100, timeoutMs: 1500 },
@@ -663,6 +673,114 @@ app.post('/api/v1/print-jobs/:id/reroute', (req, res) => {
 app.post('/api/v1/sync/flush', async (req, res) => {
   const result = await outboxSyncEngine.flushPendingBatch();
   res.json({ success: true, ...result });
+});
+
+// 8. Statutory GST Invoices & Credit Notes
+app.get('/api/v1/invoices/order/:orderId', (req, res) => {
+  const inv = db.prepare('SELECT * FROM invoices WHERE order_id = ?').get(req.params.orderId);
+  if (!inv) {
+    return res.status(404).json({ success: false, error: 'Invoice not found for this order.' });
+  }
+  res.json({ success: true, invoice: inv });
+});
+
+app.get('/api/v1/invoices/:id', (req, res) => {
+  const inv = db.prepare('SELECT * FROM invoices WHERE invoice_id = ? OR invoice_number = ?').get(req.params.id, req.params.id);
+  if (!inv) {
+    return res.status(404).json({ success: false, error: 'Invoice not found.' });
+  }
+  res.json({ success: true, invoice: inv });
+});
+
+// 9. Day-End Multi-Tender Reconciliation & Z-Report
+app.post('/api/v1/reconciliation/z-report', (req, res) => {
+  try {
+    const {
+      businessDate,
+      managerUserId,
+      managerName,
+      countedCashPaise,
+      cardBatchSettledPaise,
+      upiSettledPaise,
+      aggregatorSettledPaise,
+      startingFloatPaise,
+      cashDropsPaise,
+      paidOutsPaise,
+    } = req.body;
+
+    const summary = reconciliationEngine.generateDayEndZReport({
+      storeId: STORE_NODE_ID,
+      businessDate: businessDate || OrderStateMachine.calculateBusinessDate(new Date()),
+      managerUserId: managerUserId || 'usr-mgr-01',
+      managerName: managerName || 'Michael Smith (GM)',
+      countedCashPaise: Number(countedCashPaise || 0),
+      cardBatchSettledPaise: Number(cardBatchSettledPaise || 0),
+      upiSettledPaise: Number(upiSettledPaise || 0),
+      aggregatorSettledPaise: aggregatorSettledPaise !== undefined ? Number(aggregatorSettledPaise) : undefined,
+      startingFloatPaise: Number(startingFloatPaise || 20000),
+      cashDropsPaise: Number(cashDropsPaise || 0),
+      paidOutsPaise: Number(paidOutsPaise || 0),
+    });
+
+    res.json({ success: true, reconciliation: summary });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/v1/reconciliation/latest', (req, res) => {
+  const row = db.prepare('SELECT * FROM daily_reconciliations WHERE store_id = ? ORDER BY created_at DESC LIMIT 1').get(STORE_NODE_ID) as any;
+  if (!row) {
+    return res.json({ success: true, reconciliation: null });
+  }
+  res.json({ success: true, reconciliation: JSON.parse(row.payload_json) });
+});
+
+// 10. Menu 86-List Toggle
+app.post('/api/v1/menu/86-toggle', (req, res) => {
+  const { productId, isUnavailable } = req.body;
+  db.prepare('UPDATE products SET is_available = ? WHERE product_id = ?').run(isUnavailable ? 0 : 1, productId);
+  menuStructureEngine.set86Status(productId, isUnavailable);
+
+  // Broadcast 86 change to all connected terminals
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify({ type: 'MENU_86_UPDATE', productId, isUnavailable }));
+    }
+  });
+
+  res.json({ success: true, productId, isAvailable: !isUnavailable });
+});
+
+app.get('/api/v1/menu/86-list', (req, res) => {
+  const unavailable = db.prepare('SELECT product_id, name, is_available FROM products WHERE is_available = 0').all();
+  res.json({ success: true, unavailableItems: unavailable });
+});
+
+// 11. Support & Redacted Diagnostics Bundle
+app.get('/api/v1/support/bundle', (req, res) => {
+  const bundle = supportBundleCollector.generateDiagnosticsBundle(STORE_NODE_ID, isTrainingModeActive);
+  const sanitized = SupportBundleCollector.redactPII(bundle);
+  res.json({ success: true, supportBundle: sanitized });
+});
+
+// 12. Training Mode Toggle
+app.post('/api/v1/training-mode', (req, res) => {
+  const { enabled } = req.body;
+  isTrainingModeActive = Boolean(enabled);
+
+  // Broadcast training mode state to all terminals
+  wss.clients.forEach((client) => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(JSON.stringify({ type: 'TRAINING_MODE_CHANGED', isTrainingModeActive }));
+    }
+  });
+
+  res.json({ success: true, isTrainingModeActive });
+});
+
+app.get('/api/v1/training-mode/status', (req, res) => {
+  res.json({ success: true, isTrainingModeActive });
 });
 
 // ─── Table Floor Plan Endpoints ──────────────────────────────────────────

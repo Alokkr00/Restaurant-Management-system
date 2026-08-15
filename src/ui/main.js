@@ -235,8 +235,14 @@ function renderApp() {
 
       <!-- Right Actions & Diagnostics -->
       <div class="nav-actions">
+        <button class="btn-nav-diag" onclick="toggleTrainingMode()" style="${state.trainingModeActive ? 'background:#d97706; color:#ffffff;' : ''}" title="Toggle Isolated Training Mode (Test orders excluded from financial ledger)">
+          🎓 ${state.trainingModeActive ? 'Training ON' : 'Training'}
+        </button>
+        <button class="btn-nav-diag" onclick="downloadSupportBundle()" title="Download Sanitized Diagnostics & Support Bundle">
+          📥 Bundle
+        </button>
         <a href="${EDGE_SERVER_URL}/health" target="_blank" class="btn-nav-diag" title="Open Live Edge Node Telemetry & Hardware Diagnostics">
-          ⚡ Diagnostics
+          ⚡ Diag
         </a>
         <div class="status-pill ${state.storeOffline ? 'offline' : ''}" onclick="toggleOffline()" title="Click to simulate WAN network drop">
           <span class="status-dot"></span>
@@ -244,6 +250,16 @@ function renderApp() {
         </div>
       </div>
     </header>
+
+    ${state.trainingModeActive ? `
+      <div class="training-mode-banner">
+        <div>
+          <span class="tag">SIMULATION</span>
+          <span>⚠️ TRAINING MODE ACTIVE — Orders in this mode will NOT be recorded to the GST fiscal ledger or financial tax reports.</span>
+        </div>
+        <button class="btn-primary btn-slate" style="padding:4px 10px; font-size:0.75rem;" onclick="toggleTrainingMode()">Exit Training Mode</button>
+      </div>
+    ` : ''}
 
     <!-- Main View -->
     <main class="view-container">
@@ -545,7 +561,8 @@ function renderCashManagementWorkspace() {
       </div>
       <div class="header-actions">
         <button class="btn-primary btn-slate" onclick="openModal('cash_drop')">Record Safe Drop</button>
-        <button class="btn-primary btn-emerald" onclick="openModal('blind_z_report')">Perform Blind EOD Z-Report</button>
+        <button class="btn-primary btn-slate" onclick="openModal('blind_z_report')">Single Drawer Count</button>
+        <button class="btn-primary btn-emerald" onclick="openModal('day_end_reconciliation')">📊 Day-End Multi-Tender Z-Report</button>
       </div>
     </div>
 
@@ -1634,8 +1651,215 @@ function renderModals() {
     `;
   }
 
+  // Day-End Multi-Tender Reconciliation Modal
+  if (state.modalOpen === 'day_end_reconciliation') {
+    return `
+      <div class="modal-overlay" onclick="closeModal()">
+        <div class="modal-card" style="max-width: 680px; max-height: 90vh; overflow-y: auto;" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <div>
+              <div class="modal-title">Daily Multi-Tender Reconciliation (Z-Report)</div>
+              <div class="modal-subtitle">Reconcile POS Sales against Cash Count, Card Terminal Settlements & UPI Gateway</div>
+            </div>
+            <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
+          </div>
+
+          <form onsubmit="submitDayEndReconciliation(event)">
+            <div style="background:#090e1a; border:1px solid var(--border-subtle); border-radius:8px; padding:12px; margin-bottom:14px;">
+              <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                <span style="color:var(--text-dim); font-size:0.85rem;">Store Node:</span>
+                <span style="color:#ffffff; font-weight:700;">Store #104 (Mumbai West)</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+                <span style="color:var(--text-dim); font-size:0.85rem;">Business Date:</span>
+                <span style="color:#38bdf8; font-family:var(--font-mono); font-weight:800;">2026-08-15 (Trading Day)</span>
+              </div>
+              <div style="display:flex; justify-content:space-between;">
+                <span style="color:var(--text-dim); font-size:0.85rem;">GST Standard:</span>
+                <span class="gst-invoice-badge">5% CGST+SGST &bull; SAC 996331</span>
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.85rem;">
+              <div class="form-group">
+                <label>Physical Cash Counted (₹ INR / Cents)</label>
+                <input type="number" id="reconCashCount" class="form-control" placeholder="e.g. 430.00" value="${state.drawerSession.expectedCashUSD.toFixed(2)}" style="font-family:var(--font-mono); font-weight:800;" required />
+              </div>
+              <div class="form-group">
+                <label>Starting Drawer Float</label>
+                <input type="number" id="reconFloat" class="form-control" value="200.00" style="font-family:var(--font-mono);" required />
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.85rem;">
+              <div class="form-group">
+                <label>Card Terminal Settled Total (Batch Report)</label>
+                <input type="number" id="reconCardSettled" class="form-control" placeholder="Card Terminal Report Total" value="840.50" style="font-family:var(--font-mono); font-weight:800;" required />
+              </div>
+              <div class="form-group">
+                <label>UPI Gateway Settlement Total</label>
+                <input type="number" id="reconUpiSettled" class="form-control" placeholder="UPI Merchant App Total" value="320.00" style="font-family:var(--font-mono); font-weight:800;" required />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label>Manager Override / Variance Sign-Off Notes</label>
+              <textarea id="reconNotes" class="form-control" rows="2" placeholder="Explain any cash over/short or unverified refunds..."></textarea>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:0.65rem; margin-top:1.5rem;">
+              <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
+              <button type="submit" class="btn-primary btn-emerald">Sign Off & Close Day (Blind Z-Report)</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+  }
+
+  // Statutory GST Invoice View Modal
+  if (state.modalOpen === 'gst_invoice_view' && state.lastIssuedInvoice) {
+    const inv = state.lastIssuedInvoice;
+    return `
+      <div class="modal-overlay" onclick="closeModal()">
+        <div class="modal-card" style="max-width: 520px; max-height: 90vh; overflow-y: auto;" onclick="event.stopPropagation()">
+          <div class="modal-header">
+            <div>
+              <div class="modal-title">Statutory GST Tax Invoice</div>
+              <div class="modal-subtitle">${inv.invoiceNumber} &bull; ${inv.businessDate}</div>
+            </div>
+            <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
+          </div>
+
+          <div style="background:#090e1a; border:1px solid var(--border-subtle); border-radius:8px; padding:14px; margin-bottom:12px;">
+            <div style="text-align:center; font-family:var(--font-display); font-weight:800; font-size:1.1rem; color:#ffffff;">
+              STORE #104 (MUMBAI WEST)
+            </div>
+            <div style="text-align:center; font-size:0.75rem; color:var(--text-dim); margin-top:2px;">
+              GSTIN: 27AAPFU0939F1ZV &bull; SAC 996331 (Restaurant Dining)
+            </div>
+            <div style="margin-top:10px; border-top:1px dashed var(--border-subtle); padding-top:10px;">
+              <div style="display:flex; justify-content:space-between; font-size:0.82rem; margin-bottom:4px;">
+                <span style="color:var(--text-muted);">Invoice No:</span>
+                <span style="color:#38bdf8; font-family:var(--font-mono); font-weight:700;">${inv.invoiceNumber}</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; font-size:0.82rem; margin-bottom:4px;">
+                <span style="color:var(--text-muted);">Business Date:</span>
+                <span style="color:#ffffff;">${inv.businessDate}</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; font-size:0.82rem;">
+                <span style="color:var(--text-muted);">Order Ref:</span>
+                <span style="color:#ffffff; font-family:var(--font-mono);">${inv.orderId.substring(0, 8)}</span>
+              </div>
+            </div>
+          </div>
+
+          ${inv.upiQrPayload ? `
+            <div class="upi-qr-card">
+              <div class="upi-qr-placeholder">
+                <div class="upi-qr-icon">📱</div>
+                <div class="upi-qr-text">BHIM / UPI PAY</div>
+                <div style="font-size:0.65rem; color:#64748b; font-weight:700;">Scan to Pay ₹${((inv.taxSummary?.grandTotalPaise || 0) / 100).toFixed(2)}</div>
+              </div>
+              <div class="upi-vpa-pill">UPI ID: store104.pos@icici</div>
+            </div>
+          ` : ''}
+
+          <div style="display:flex; justify-content:flex-end; gap:0.65rem; margin-top:1.25rem;">
+            <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Close</button>
+            <button type="button" class="btn-primary btn-blue" onclick="
+              showToast({ title: 'ESC/POS Print Sent', message: 'Invoice dispatched to Front Counter Thermal Printer (Port 9100).', type: 'success' });
+              closeModal();
+            ">🖨️ Print Customer Invoice</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   return '';
 }
+
+// Global Operations Handlers
+window.toggleTrainingMode = async function() {
+  state.trainingModeActive = !state.trainingModeActive;
+  try {
+    await fetch(`${EDGE_SERVER_URL}/api/v1/training-mode`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: state.trainingModeActive })
+    });
+  } catch {}
+  showToast({
+    title: state.trainingModeActive ? 'Training Mode ACTIVE' : 'Live Mode RESTORED',
+    message: state.trainingModeActive 
+      ? 'Orders in this mode are isolated from fiscal ledger & tax reports.' 
+      : 'All transactions are now recorded to the authoritative store database.',
+    type: state.trainingModeActive ? 'warning' : 'success',
+    duration: 5000
+  });
+  renderApp();
+};
+
+window.downloadSupportBundle = async function() {
+  try {
+    const res = await fetch(`${EDGE_SERVER_URL}/api/v1/support/bundle`);
+    const data = await res.json();
+    if (data.success) {
+      const blob = new Blob([JSON.stringify(data.supportBundle, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `RMS_Support_Bundle_${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast({
+        title: 'Support Bundle Downloaded',
+        message: 'Redacted diagnostic logs ready to send to engineering.',
+        type: 'success'
+      });
+    }
+  } catch (err) {
+    showToast({ title: 'Diagnostics Error', message: 'Could not generate support bundle.', type: 'error' });
+  }
+};
+
+window.submitDayEndReconciliation = async function(e) {
+  e.preventDefault();
+  const countedCash = parseFloat(document.getElementById('reconCashCount').value || 0) * 100;
+  const cardSettled = parseFloat(document.getElementById('reconCardSettled').value || 0) * 100;
+  const upiSettled = parseFloat(document.getElementById('reconUpiSettled').value || 0) * 100;
+  const floatPaise = parseFloat(document.getElementById('reconFloat').value || 0) * 100;
+
+  try {
+    const res = await fetch(`${EDGE_SERVER_URL}/api/v1/reconciliation/z-report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        countedCashPaise: countedCash,
+        cardBatchSettledPaise: cardSettled,
+        upiSettledPaise: upiSettled,
+        startingFloatPaise: floatPaise,
+        managerUserId: 'usr-mgr-01',
+        managerName: 'Michael Smith (GM)',
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      const variance = (data.reconciliation.netOverShortVariancePaise / 100).toFixed(2);
+      showToast({
+        title: 'Day-End Z-Report Settled!',
+        message: `Trading day closed. Net Variance: $${variance} (${data.reconciliation.status}).`,
+        type: data.reconciliation.isBalanced ? 'success' : 'warning',
+        duration: 6000
+      });
+      closeModal();
+    }
+  } catch (err) {
+    showToast({ title: 'Reconciliation Saved', message: 'Z-Report signed off locally.', type: 'info' });
+    closeModal();
+  }
+};
 
 // Global Image Upload & Catalog Handlers
 window.selectNewMenuImagePreset = function(imgPath) {

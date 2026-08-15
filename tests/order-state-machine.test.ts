@@ -15,16 +15,19 @@ describe('OrderStateMachine & Server-Side Integer Pricing Engine', () => {
   let syncOutboxTable: any[] = [];
   let auditEventsTable: any[] = [];
 
-  const storeSeed = { store_id: 'store-104', currency: 'USD', tax_rate_bps: 800 };
+  const storeSeed = { store_id: 'store-104', name: 'The Pizza Co.', currency: 'USD', tax_rate_bps: 800, country_code: 'US', is_tax_inclusive: 0, service_charge_bps: 0 };
   const menuVersionSeed = { menu_version_id: 'menu-v1', version_number: 1, is_active: 1 };
   const productsSeed: Record<string, any> = {
-    'item-101': { product_id: 'item-101', name: 'Large Pepperoni Pizza', price_cents: 1899, is_available: 1 },
-    'item-104': { product_id: 'item-104', name: 'Spicy Buffalo Wings', price_cents: 1299, is_available: 1 },
-    'item-105': { product_id: 'item-105', name: 'Artisanal Garlic Knots', price_cents: 699, is_available: 1 },
+    'item-101': { product_id: 'item-101', name: 'Large Pepperoni Pizza', price_cents: 1899, is_available: 1, sac_code: '996331' },
+    'item-104': { product_id: 'item-104', name: 'Spicy Buffalo Wings', price_cents: 1299, is_available: 1, sac_code: '996331' },
+    'item-105': { product_id: 'item-105', name: 'Artisanal Garlic Knots', price_cents: 699, is_available: 1, sac_code: '996331' },
   };
   const modifiersSeed: Record<string, any> = {
     'mod-extra-cheese': { modifier_id: 'mod-extra-cheese', name: 'Extra Mozzarella', price_cents: 200 },
   };
+
+  let invoicesTable: any[] = [];
+  let creditNotesTable: any[] = [];
 
   beforeEach(() => {
     ordersTable = new Map();
@@ -35,6 +38,8 @@ describe('OrderStateMachine & Server-Side Integer Pricing Engine', () => {
     kitchenTicketsTable = [];
     syncOutboxTable = [];
     auditEventsTable = [];
+    invoicesTable = [];
+    creditNotesTable = [];
 
     mockDb = {
       transaction: (fn: Function) => (...args: any[]) => fn(...args),
@@ -68,6 +73,9 @@ describe('OrderStateMachine & Server-Side Integer Pricing Engine', () => {
           if (sql.includes('FROM payments WHERE idempotency_key = ?')) {
             return paymentsTable.find(p => p.idempotency_key === params[0]);
           }
+          if (sql.includes('FROM invoices WHERE order_id = ?')) {
+            return invoicesTable.find(i => i.order_id === params[0]);
+          }
           return undefined;
         },
         all: (...params: any[]) => {
@@ -87,10 +95,10 @@ describe('OrderStateMachine & Server-Side Integer Pricing Engine', () => {
         },
         run: (...params: any[]) => {
           if (sql.includes('INSERT INTO orders')) {
-            const [order_id, store_id, terminal_id, table_id, order_type, menu_version_id, subtotal_cents, tax_cents, total_cents, currency, idempotency_key, created_at, updated_at] = params;
+            const [order_id, store_id, terminal_id, table_id, order_type, business_date, is_training, menu_version_id, subtotal_cents, tax_cents, total_cents, currency, idempotency_key, created_at, updated_at] = params;
             ordersTable.set(order_id, {
               order_id, store_id, terminal_id, table_id, order_type, status: 'DRAFT',
-              menu_version_id, subtotal_cents, tax_cents, discount_cents: 0, total_cents,
+              business_date, is_training, menu_version_id, subtotal_cents, tax_cents, discount_cents: 0, total_cents,
               currency, idempotency_key, created_at, updated_at,
             });
           } else if (sql.includes('INSERT INTO order_lines')) {
@@ -116,6 +124,9 @@ describe('OrderStateMachine & Server-Side Integer Pricing Engine', () => {
           } else if (sql.includes('INSERT INTO payments')) {
             const [payment_id, order_id, store_id, tender_type, amount_cents, change_cents, terminal_ref, idempotency_key, created_at] = params;
             paymentsTable.push({ payment_id, order_id, store_id, tender_type, amount_cents, change_cents, status: 'SETTLED', terminal_ref, idempotency_key, created_at });
+          } else if (sql.includes('INSERT INTO invoices')) {
+            const [invoice_id, invoice_number, store_id, order_id, sequence_number, business_date, financial_year, gstin, subtotal_paise, total_tax_paise, cgst_paise, sgst_paise, igst_paise, grand_total_paise, currency, upi_qr_payload, created_at] = params;
+            invoicesTable.push({ invoice_id, invoice_number, store_id, order_id, sequence_number, business_date, financial_year, gstin, subtotal_paise, total_tax_paise, cgst_paise, sgst_paise, igst_paise, grand_total_paise, currency, upi_qr_payload, status: 'ISSUED', created_at });
           } else if (sql.includes('INSERT INTO print_jobs')) {
             const [job_id, order_id, payload_raw, created_at, updated_at] = params;
             const job_type = sql.includes("'RECEIPT'") ? 'RECEIPT' : 'KOT';

@@ -271,6 +271,119 @@ export const migrations: Migration[] = [
           ('usr-csh-01', 'store-104', 'CASHIER', 'Sarah Jenkins (Cashier)', 'a1b2c3d4e5f60718:8e9c56f8f5370335e985b3bcf72c3d42c38d2121e784566c3a647f11818ff243', 1, datetime('now'));
       `);
     }
+  },
+  {
+    version: 2,
+    name: '002_gst_fiscal_and_reconciliation_schema',
+    up: (db: any) => {
+      // Safe Column Additions
+      const safeAddColumn = (sql: string) => {
+        try {
+          db.exec(sql);
+        } catch {
+          // Column may already exist
+        }
+      };
+
+      safeAddColumn("ALTER TABLE stores ADD COLUMN country_code TEXT NOT NULL DEFAULT 'IN';");
+      safeAddColumn("ALTER TABLE stores ADD COLUMN gstin TEXT DEFAULT '27AAPFU0939F1ZV';");
+      safeAddColumn("ALTER TABLE stores ADD COLUMN state_code TEXT DEFAULT '27';");
+      safeAddColumn("ALTER TABLE stores ADD COLUMN is_tax_inclusive INTEGER NOT NULL DEFAULT 0;");
+      safeAddColumn("ALTER TABLE stores ADD COLUMN service_charge_bps INTEGER NOT NULL DEFAULT 500;");
+      safeAddColumn("ALTER TABLE stores ADD COLUMN upi_vpa TEXT DEFAULT 'store104.pos@icici';");
+      safeAddColumn("ALTER TABLE stores ADD COLUMN trading_day_rollover_time TEXT NOT NULL DEFAULT '04:00';");
+
+      safeAddColumn("ALTER TABLE orders ADD COLUMN business_date TEXT NOT NULL DEFAULT '2026-08-15';");
+      safeAddColumn("ALTER TABLE orders ADD COLUMN is_training INTEGER NOT NULL DEFAULT 0;");
+      safeAddColumn("ALTER TABLE products ADD COLUMN sac_code TEXT NOT NULL DEFAULT '996331';");
+
+      db.exec(`
+        -- Statutory Fiscal Invoices Table (GST / Sequential FY Numbering)
+        CREATE TABLE IF NOT EXISTS invoices (
+          invoice_id TEXT PRIMARY KEY,
+          invoice_number TEXT NOT NULL UNIQUE,
+          store_id TEXT NOT NULL,
+          order_id TEXT NOT NULL,
+          sequence_number INTEGER NOT NULL,
+          business_date TEXT NOT NULL,
+          financial_year TEXT NOT NULL,
+          gstin TEXT NOT NULL,
+          subtotal_paise INTEGER NOT NULL,
+          total_tax_paise INTEGER NOT NULL,
+          cgst_paise INTEGER NOT NULL DEFAULT 0,
+          sgst_paise INTEGER NOT NULL DEFAULT 0,
+          igst_paise INTEGER NOT NULL DEFAULT 0,
+          service_charge_paise INTEGER NOT NULL DEFAULT 0,
+          grand_total_paise INTEGER NOT NULL,
+          currency TEXT NOT NULL DEFAULT 'INR',
+          upi_qr_payload TEXT,
+          status TEXT NOT NULL CHECK(status IN ('ISSUED', 'CANCELLED', 'REFUNDED')),
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (store_id) REFERENCES stores(store_id),
+          FOREIGN KEY (order_id) REFERENCES orders(order_id)
+        );
+
+        -- Statutory Credit Notes Table (Reversing Records for Voids/Refunds)
+        CREATE TABLE IF NOT EXISTS credit_notes (
+          credit_note_id TEXT PRIMARY KEY,
+          credit_note_number TEXT NOT NULL UNIQUE,
+          invoice_id TEXT NOT NULL,
+          original_invoice_number TEXT NOT NULL,
+          store_id TEXT NOT NULL,
+          sequence_number INTEGER NOT NULL,
+          business_date TEXT NOT NULL,
+          reason TEXT NOT NULL,
+          amount_paise INTEGER NOT NULL,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (invoice_id) REFERENCES invoices(invoice_id),
+          FOREIGN KEY (store_id) REFERENCES stores(store_id)
+        );
+
+        -- Multi-Tender Day-End Reconciliations Table
+        CREATE TABLE IF NOT EXISTS daily_reconciliations (
+          reconciliation_id TEXT PRIMARY KEY,
+          store_id TEXT NOT NULL,
+          business_date TEXT NOT NULL,
+          manager_user_id TEXT NOT NULL,
+          gross_sales_paise INTEGER NOT NULL,
+          net_sales_paise INTEGER NOT NULL,
+          total_tax_paise INTEGER NOT NULL,
+          expected_total_paise INTEGER NOT NULL,
+          settled_total_paise INTEGER NOT NULL,
+          variance_paise INTEGER NOT NULL,
+          status TEXT NOT NULL CHECK(status IN ('RECONCILED', 'VARIANCE_FLAGGED')),
+          payload_json TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (store_id) REFERENCES stores(store_id)
+        );
+
+        -- Hardware Device Bindings
+        CREATE TABLE IF NOT EXISTS hardware_devices (
+          device_id TEXT PRIMARY KEY,
+          store_id TEXT NOT NULL,
+          model_id TEXT NOT NULL,
+          device_role TEXT NOT NULL,
+          connection_type TEXT NOT NULL,
+          network_host TEXT,
+          network_port INTEGER,
+          fallback_device_id TEXT,
+          is_active INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (store_id) REFERENCES stores(store_id)
+        );
+
+        -- Update Store #104 with Indian GST & UPI Profile
+        UPDATE stores 
+        SET currency = 'INR', 
+            tax_rate_bps = 500, 
+            country_code = 'IN', 
+            gstin = '27AAPFU0939F1ZV', 
+            state_code = '27',
+            service_charge_bps = 500,
+            upi_vpa = 'store104.pos@icici'
+        WHERE store_id = 'store-104';
+      `);
+    }
   }
 ];
 
