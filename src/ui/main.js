@@ -494,13 +494,13 @@ function renderPOSRegisterWorkspace() {
         <!-- Scrollable Ticket Items List inside Cart -->
         <div class="cart-items-scroll">
           ${state.cart.length === 0 ? `
-            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2rem 1rem; text-align:center; margin:auto 0;">
-              <div style="font-size:2.5rem; margin-bottom:0.5rem; opacity:0.8;">🍽️</div>
-              <div style="font-size:1.1rem; font-weight:800; color:#ffffff;">Ticket is empty</div>
-              <div style="font-size:0.8rem; color:var(--text-muted); margin-top:0.25rem; max-width:220px;">Tap any dish to quick-add, or tap ⚙️ to customize toppings.</div>
-              <div style="display:flex; gap:0.5rem; margin-top:1rem;">
-                <button class="btn-primary btn-slate" style="font-size:0.8rem; min-height:36px; padding:0.35rem 0.75rem;" onclick="selectModule('table_floor_plan')">🪑 Floor Plan</button>
-                <button class="btn-primary btn-emerald" style="font-size:0.8rem; min-height:36px; padding:0.35rem 0.75rem;" onclick="quickAddToCart('item-1')">⚡ Pepperoni</button>
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1rem 0.5rem; text-align:center; margin:auto 0;">
+              <div style="font-size:2rem; margin-bottom:0.25rem; opacity:0.8;">🍽️</div>
+              <div style="font-size:0.95rem; font-weight:800; color:#ffffff;">Ticket is empty</div>
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem; max-width:200px;">Tap any dish to quick-add, or tap ⚙️ to customize toppings.</div>
+              <div style="display:flex; gap:0.4rem; margin-top:0.6rem;">
+                <button class="btn-primary btn-slate" style="font-size:0.75rem; min-height:32px; padding:0.25rem 0.6rem;" onclick="selectModule('table_floor_plan')">🪑 Floor Plan</button>
+                <button class="btn-primary btn-emerald" style="font-size:0.75rem; min-height:32px; padding:0.25rem 0.6rem;" onclick="quickAddToCart('item-1')">⚡ Pepperoni</button>
               </div>
             </div>
           ` : state.cart.map((item, idx) => `
