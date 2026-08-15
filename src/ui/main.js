@@ -438,12 +438,12 @@ function renderPOSRegisterWorkspace() {
       <div class="pos-menu-column">
         <div class="section-header">
           <div>
-            <h2 class="section-title">Point of Sale Register</h2>
-            <p class="section-subtitle">Terminal 01 &bull; Local SQLite WAL Persistence &bull; Sub-200ms LAN Dispatch</p>
+            <h2 class="section-title" style="font-size:1.15rem; margin-bottom:0.1rem;">Point of Sale Register</h2>
+            <p class="section-subtitle" style="font-size:0.7rem; margin:0;">Terminal 01 &bull; Local SQLite WAL Persistence &bull; Sub-200ms LAN Dispatch</p>
           </div>
           <div class="header-actions">
-            <span class="badge badge-online">DRAWER OPEN: $${state.drawerSession.expectedCashUSD.toFixed(2)} EXP</span>
-            <button class="btn-primary btn-slate" onclick="openModal('cash_drop')">Mid-Shift Safe Drop</button>
+            <span class="badge badge-online" style="font-size:0.75rem; padding:0.25rem 0.6rem;">DRAWER: $${state.drawerSession.expectedCashUSD.toFixed(2)}</span>
+            <button class="btn-primary btn-slate" style="font-size:0.75rem; min-height:30px; padding:0.25rem 0.6rem;" onclick="openModal('cash_drop')">Mid-Shift Safe Drop</button>
           </div>
         </div>
 
@@ -485,22 +485,22 @@ function renderPOSRegisterWorkspace() {
       <div class="cart-sidebar-docked">
         <div class="cart-header-fixed">
           <div>
-            <h3 style="font-size:1.15rem; font-weight:800; color:#ffffff;">Current Ticket</h3>
-            <span style="font-size:0.8rem; color:var(--text-muted);">Dine In &bull; Terminal 01</span>
+            <h3 style="font-size:1.05rem; font-weight:800; color:#ffffff;">Current Ticket</h3>
+            <span style="font-size:0.72rem; color:var(--text-muted);">Dine In &bull; Terminal 01</span>
           </div>
-          <button class="btn-primary btn-slate" style="padding:0.4rem 0.85rem; font-size:0.78rem; min-height:36px;" onclick="clearCart()" ${state.cart.length === 0 ? 'disabled' : ''}>Clear</button>
+          <button class="btn-primary btn-slate" style="padding:0.25rem 0.65rem; font-size:0.75rem; min-height:30px;" onclick="clearCart()" ${state.cart.length === 0 ? 'disabled' : ''}>Clear</button>
         </div>
 
         <!-- Scrollable Ticket Items List inside Cart -->
         <div class="cart-items-scroll">
           ${state.cart.length === 0 ? `
             <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1rem 0.5rem; text-align:center; margin:auto 0;">
-              <div style="font-size:2rem; margin-bottom:0.25rem; opacity:0.8;">🍽️</div>
-              <div style="font-size:0.95rem; font-weight:800; color:#ffffff;">Ticket is empty</div>
-              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:0.2rem; max-width:200px;">Tap any dish to quick-add, or tap ⚙️ to customize toppings.</div>
-              <div style="display:flex; gap:0.4rem; margin-top:0.6rem;">
-                <button class="btn-primary btn-slate" style="font-size:0.75rem; min-height:32px; padding:0.25rem 0.6rem;" onclick="selectModule('table_floor_plan')">🪑 Floor Plan</button>
-                <button class="btn-primary btn-emerald" style="font-size:0.75rem; min-height:32px; padding:0.25rem 0.6rem;" onclick="quickAddToCart('item-1')">⚡ Pepperoni</button>
+              <div style="font-size:1.8rem; margin-bottom:0.2rem; opacity:0.8;">🍽️</div>
+              <div style="font-size:0.92rem; font-weight:800; color:#ffffff;">Ticket is empty</div>
+              <div style="font-size:0.72rem; color:var(--text-muted); margin-top:0.15rem; max-width:200px;">Tap any dish to quick-add, or tap ⚙️ to customize toppings.</div>
+              <div style="display:flex; gap:0.4rem; margin-top:0.5rem;">
+                <button class="btn-primary btn-slate" style="font-size:0.72rem; min-height:30px; padding:0.2rem 0.55rem;" onclick="selectModule('table_floor_plan')">🪑 Floor Plan</button>
+                <button class="btn-primary btn-emerald" style="font-size:0.72rem; min-height:30px; padding:0.2rem 0.55rem;" onclick="quickAddToCart('item-1')">⚡ Pepperoni</button>
               </div>
             </div>
           ` : state.cart.map((item, idx) => `
@@ -517,10 +517,10 @@ function renderPOSRegisterWorkspace() {
               <div class="cart-item-controls">
                 <div class="qty-control">
                   <button class="qty-btn" onclick="updateCartQty(${idx}, -1)">-</button>
-                  <span style="font-weight:900; font-family:var(--font-mono); font-size:1.1rem; width:28px; text-align:center;">${item.qty}</span>
+                  <span style="font-weight:900; font-family:var(--font-mono); font-size:0.95rem; width:24px; text-align:center;">${item.qty}</span>
                   <button class="qty-btn" onclick="updateCartQty(${idx}, 1)">+</button>
                 </div>
-                <span style="font-size:0.78rem; color:var(--text-muted); font-family:var(--font-mono);">$${(item.basePrice + (item.modifiersCost || 0)).toFixed(2)} ea</span>
+                <span style="font-size:0.72rem; color:var(--text-muted); font-family:var(--font-mono);">$${(item.basePrice + (item.modifiersCost || 0)).toFixed(2)} ea</span>
               </div>
             </div>
           `).join('')}
@@ -528,8 +528,8 @@ function renderPOSRegisterWorkspace() {
 
         <!-- Pinned Bottom Controls (Always Visible & Accessible on All Heights) -->
         <div class="cart-footer-pinned">
-          <div class="quick-cash-bar" style="padding:0; background:none; border:none;">
-            <div class="quick-cash-title" style="margin-bottom:0.25rem;">Quick Cash Tender (1-Thumb Tap)</div>
+          <div class="quick-cash-bar">
+            <div class="quick-cash-title">Quick Cash Tender (1-Thumb Tap)</div>
             <div class="quick-cash-buttons">
               <button class="btn-cash-quick" onclick="quickCashCheckout(10)" ${total > 10 || state.cart.length === 0 ? 'disabled' : ''}>$10</button>
               <button class="btn-cash-quick" onclick="quickCashCheckout(20)" ${total > 20 || state.cart.length === 0 ? 'disabled' : ''}>$20</button>
@@ -538,7 +538,7 @@ function renderPOSRegisterWorkspace() {
             </div>
           </div>
 
-          <div style="display:flex; flex-direction:column; gap:0.25rem; margin-top:0.25rem;">
+          <div style="display:flex; flex-direction:column; gap:0.15rem; margin-top:0.15rem;">
             <div class="totals-row">
               <span>Subtotal</span>
               <span style="font-family:var(--font-mono); font-weight:700;">$${subtotal.toFixed(2)}</span>
@@ -547,13 +547,13 @@ function renderPOSRegisterWorkspace() {
               <span>Sales Tax (8%)</span>
               <span style="font-family:var(--font-mono); font-weight:700;">$${taxAmount.toFixed(2)}</span>
             </div>
-            <div class="totals-row total-due" style="font-size:1.5rem; padding-top:0.25rem;">
+            <div class="totals-row total-due" style="font-size:1.25rem; padding-top:0.15rem;">
               <span>Total Due</span>
               <span>$${total.toFixed(2)}</span>
             </div>
           </div>
 
-          <div class="checkout-actions-grid" style="margin-top:0.25rem;">
+          <div class="checkout-actions-grid" style="margin-top:0.15rem;">
             <button class="btn-primary btn-checkout" onclick="checkoutOrder('CARD')" ${state.cart.length === 0 ? 'disabled' : ''}>
               💳 Charge Card
             </button>
