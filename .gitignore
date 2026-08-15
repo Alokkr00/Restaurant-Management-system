@@ -24,3 +24,8 @@ coverage/
 *.db
 *.db-shm
 *.db-wal
+*.db.json
+dist-server/
+*.txt
+*.mjs
+

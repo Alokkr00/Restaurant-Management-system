@@ -53,9 +53,8 @@ export class TransactionalOutboxSyncEngine {
    * Dispatches ordered batches of unacknowledged events to central cloud service
    */
   public async flushPendingBatch(batchSize = 50): Promise<SyncBatchResult> {
-    const countPending = (
-      this.db.prepare('SELECT COUNT(*) as count FROM sync_outbox WHERE delivered_at IS NULL').get() as { count: number }
-    ).count;
+    const countPendingResult = this.db.prepare('SELECT COUNT(*) as count FROM sync_outbox WHERE delivered_at IS NULL').get() as { count?: number; cnt?: number } | undefined;
+    const countPending = countPendingResult?.count ?? countPendingResult?.cnt ?? 0;
 
     if (!this.isWanConnected || countPending === 0) {
       return { flushedCount: 0, remainingPending: countPending, lastDeliveredSeq: null };

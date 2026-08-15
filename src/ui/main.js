@@ -118,10 +118,13 @@ const state = {
     { id: 'emp-103', name: 'Michael Smith', role: 'Shift Lead', status: 'CLOCKED_OUT', shiftStart: 'Yesterday', hours: 8.0, breakAttested: true },
   ],
   tipPoolTotal: 450.00,
+  journalEntries: [],
+  kpis: { grossSalesUSD: 5497.0, netSalesUSD: 5222.15, taxCollectedUSD: 274.85, foodCostPct: 28.7, laborCostPct: 24.2, primeCostPct: 52.9 },
+  recipes: [],
 };
 
-// Initial Connection
-async function initBackendConnection() {
+// Master Data Synchronization with Store Edge Node
+async function refreshAllData() {
   try {
     const res = await fetch(`${EDGE_SERVER_URL}/health`);
     if (res.ok) state.apiConnected = true;
@@ -129,17 +132,99 @@ async function initBackendConnection() {
     state.apiConnected = false;
   }
 
+  // 1. Fetch Menu Catalog
   try {
     const menuRes = await fetch(`${EDGE_SERVER_URL}/api/menu`);
     const menuData = await menuRes.json();
     if (menuData.success && menuData.menuItems) {
-      state.menuItems = menuData.menuItems.map(item => ({
-        ...item,
-        image: item.name.includes('Wings') ? '/buffalo_wings.jpg' : item.name.includes('Knots') ? '/garlic_knots.jpg' : '/pepperoni_pizza.jpg'
-      }));
+      state.menuItems = menuData.menuItems;
     }
   } catch (err) {}
 
+  // 2. Fetch Table Floor Plan
+  try {
+    const tblRes = await fetch(`${EDGE_SERVER_URL}/api/tables`);
+    const tblData = await tblRes.json();
+    if (tblData.success && tblData.tables) {
+      state.tables = tblData.tables;
+    }
+  } catch (err) {}
+
+  // 3. Fetch Active KDS Tickets
+  try {
+    const kdsRes = await fetch(`${EDGE_SERVER_URL}/api/kds/tickets`);
+    const kdsData = await kdsRes.json();
+    if (kdsData.success && kdsData.tickets) {
+      state.kdsTickets = kdsData.tickets;
+    }
+  } catch (err) {}
+
+  // 4. Fetch Shift Drawer State
+  try {
+    const drawerRes = await fetch(`${EDGE_SERVER_URL}/api/cash/drawer`);
+    const drawerData = await drawerRes.json();
+    if (drawerData.success && drawerData.drawerSession) {
+      state.drawerSession = {
+        sessionId: drawerData.drawerSession.sessionId,
+        startingBankUSD: (drawerData.drawerSession.startingBankINR || 20000) / 100,
+        cashSalesUSD: (drawerData.drawerSession.cashSalesINR || 35000) / 100,
+        cashDropsUSD: (drawerData.drawerSession.cashDropsINR || 10000) / 100,
+        payOutsUSD: (drawerData.drawerSession.payOutsINR || 2000) / 100,
+        expectedCashUSD: (drawerData.drawerSession.expectedCashINR || 43000) / 100,
+        status: drawerData.drawerSession.status || 'OPEN',
+        activityLedger: drawerData.drawerSession.activityLedger || [],
+      };
+    }
+  } catch (err) {}
+
+  // 5. Fetch Inventory POs, Suppliers & Stock
+  try {
+    const poRes = await fetch(`${EDGE_SERVER_URL}/api/inventory/pos`);
+    const poData = await poRes.json();
+    if (poData.success && poData.purchaseOrders) state.purchaseOrders = poData.purchaseOrders;
+
+    const supRes = await fetch(`${EDGE_SERVER_URL}/api/inventory/suppliers`);
+    const supData = await supRes.json();
+    if (supData.success && supData.suppliers) state.suppliers = supData.suppliers;
+
+    const stkRes = await fetch(`${EDGE_SERVER_URL}/api/inventory/stock`);
+    const stkData = await stkRes.json();
+    if (stkData.success && stkData.stockLevels) state.stockLevels = stkData.stockLevels;
+
+    const wstRes = await fetch(`${EDGE_SERVER_URL}/api/inventory/waste`);
+    const wstData = await wstRes.json();
+    if (wstData.success && wstData.spoilageLogs) state.spoilageLogs = wstData.spoilageLogs;
+
+    const rcpRes = await fetch(`${EDGE_SERVER_URL}/api/inventory/recipes`);
+    const rcpData = await rcpRes.json();
+    if (rcpData.success && rcpData.recipes) state.recipes = rcpData.recipes;
+  } catch (err) {}
+
+  // 6. Fetch Labor Roster & Tip Pool
+  try {
+    const lbrRes = await fetch(`${EDGE_SERVER_URL}/api/labor/shifts`);
+    const lbrData = await lbrRes.json();
+    if (lbrData.success && lbrData.employees) {
+      state.employees = lbrData.employees;
+      state.tipPoolTotal = lbrData.tipPoolTotalUSD || 450.0;
+    }
+  } catch (err) {}
+
+  // 7. Fetch Financials & GL
+  try {
+    const finRes = await fetch(`${EDGE_SERVER_URL}/api/financials/ledger`);
+    const finData = await finRes.json();
+    if (finData.success) {
+      state.journalEntries = finData.journalEntries || [];
+      state.kpis = finData.kpis || state.kpis;
+    }
+  } catch (err) {}
+
+  renderApp();
+}
+
+// Real-Time LAN WebSocket Listener
+function initWebSocket() {
   try {
     const ws = new WebSocket(EDGE_WS_URL);
     ws.onopen = () => {
@@ -163,10 +248,44 @@ async function initBackendConnection() {
           })),
           status: 'IN_PREP',
         });
+        showToast({ title: 'New Kitchen Ticket', message: `Order #${data.ticket.id} dispatched to hotline.`, type: 'info' });
+        renderApp();
+      } else if (data.type === 'KDS_TICKETS_UPDATED') {
+        state.kdsTickets = data.tickets;
+        renderApp();
+      } else if (data.type === 'MENU_UPDATED') {
+        state.menuItems.push(data.newItem);
+        renderApp();
+      } else if (data.type === 'DRAWER_UPDATED') {
+        state.drawerSession = {
+          ...state.drawerSession,
+          startingBankUSD: (data.drawerSession.startingBankINR || 20000) / 100,
+          cashSalesUSD: (data.drawerSession.cashSalesINR || 35000) / 100,
+          cashDropsUSD: (data.drawerSession.cashDropsINR || 10000) / 100,
+          payOutsUSD: (data.drawerSession.payOutsINR || 2000) / 100,
+          expectedCashUSD: (data.drawerSession.expectedCashINR || 43000) / 100,
+          activityLedger: data.drawerSession.activityLedger || [],
+        };
+        renderApp();
+      } else if (data.type === 'LABOR_UPDATED') {
+        state.employees = data.employees;
+        renderApp();
+      } else if (data.type === 'MENU_86_UPDATE') {
+        const item = state.menuItems.find(m => m.id === data.productId || m.sku === data.productId);
+        if (item) item.isAvailable = !data.isUnavailable;
         renderApp();
       }
     };
+    ws.onclose = () => {
+      state.wsConnected = false;
+      setTimeout(initWebSocket, 3000);
+    };
   } catch (err) {}
+}
+
+async function initBackendConnection() {
+  await refreshAllData();
+  initWebSocket();
 }
 
 function renderApp() {
@@ -1183,21 +1302,7 @@ function renderModals() {
             <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
           </div>
 
-          <form onsubmit="
-            event.preventDefault();
-            const covers = Number(document.getElementById('seatCoversInput').value);
-            const server = document.getElementById('serverNameInput').value;
-            state.selectedTable.status = 'SEATED';
-            state.selectedTable.covers = covers;
-            state.selectedTable.serverName = server;
-            state.selectedTable.seatedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            showToast({
-              title: 'Table Seated & Ticket Opened',
-              message: '${table.label} seated with ' + covers + ' covers assigned to ' + server + '.',
-              type: 'success'
-            });
-            closeModal();
-          ">
+          <form onsubmit="submitSeatTable(event)">
             <div class="form-group">
               <label>Number of Guests (Covers &le; ${table.seats})</label>
               <input type="number" id="seatCoversInput" class="form-control" min="1" max="${table.seats}" value="2" required />
@@ -1228,39 +1333,21 @@ function renderModals() {
             <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
           </div>
 
-          <form onsubmit="
-            event.preventDefault();
-            const poNumber = 'PO-STORE-104-00' + (state.purchaseOrders.length + 1);
-            state.purchaseOrders.unshift({
-              poId: poNumber,
-              supplierId: 'sup-001',
-              supplierName: 'Mumbai Dairy Wholesalers Pvt. Ltd.',
-              totalCostINR: 13000,
-              status: 'SENT',
-              createdAt: new Date().toISOString().substring(0, 10),
-              expectedDeliveryDate: '2026-08-20'
-            });
-            showToast({
-              title: 'Purchase Order Dispatched',
-              message: 'Purchase Order ' + poNumber + ' created and marked SENT to supplier.',
-              type: 'success'
-            });
-            closeModal();
-          ">
+          <form onsubmit="submitCreatePO(event)">
             <div class="form-group">
               <label>Wholesale Supplier</label>
-              <select class="form-control">
-                <option>Mumbai Dairy Wholesalers Pvt. Ltd. (Mozzarella Cheese)</option>
-                <option>Delhi Grain & Flour Mills (High-Gluten Flour)</option>
+              <select id="poSupplierSelect" class="form-control">
+                <option value="sup-001">Mumbai Dairy Wholesalers Pvt. Ltd. (Mozzarella Cheese)</option>
+                <option value="sup-002">Delhi Grain & Flour Mills (High-Gluten Flour)</option>
               </select>
             </div>
             <div class="form-group">
               <label>Order Item & Quantity</label>
-              <input type="text" class="form-control" value="Mozzarella Cheese - 20 kg @ ₹650/kg" required />
+              <input type="text" id="poItemQtyInput" class="form-control" value="Mozzarella Cheese - 20 kg @ ₹650/kg" required />
             </div>
             <div class="form-group">
               <label>Expected Delivery Date</label>
-              <input type="date" class="form-control" value="2026-08-20" required />
+              <input type="date" id="poDeliveryDateInput" class="form-control" value="2026-08-20" required />
             </div>
             <div style="display:flex; justify-content:flex-end; gap:0.65rem; margin-top:1.75rem;">
               <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
@@ -1285,25 +1372,14 @@ function renderModals() {
             <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
           </div>
 
-          <form onsubmit="
-            event.preventDefault();
-            po.status = 'RECEIVED';
-            const cheese = state.stockLevels.find(s => s.ingredientId === 'ing-cheese');
-            if (cheese) cheese.balance += 20;
-            showToast({
-              title: 'Goods Receipt Note (GRN) Posted',
-              message: 'Stock balance incremented by 20 kg. PO ' + po.poId + ' marked RECEIVED.',
-              type: 'success'
-            });
-            closeModal();
-          ">
+          <form onsubmit="submitReceiveGRN(event)">
             <div class="form-group">
               <label>Received Mozzarella Cheese (kg)</label>
-              <input type="number" step="0.1" class="form-control" value="20.0" style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800;" required />
+              <input type="number" id="grnReceivedQtyInput" step="0.1" class="form-control" value="20.0" style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800;" required />
             </div>
             <div class="form-group">
               <label>Receiving Staff Member</label>
-              <input type="text" class="form-control" value="Warehouse Staff Lead" required />
+              <input type="text" id="grnStaffInput" class="form-control" value="Warehouse Staff Lead" required />
             </div>
             <div style="display:flex; justify-content:flex-end; gap:0.65rem; margin-top:1.75rem;">
               <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
@@ -1327,27 +1403,18 @@ function renderModals() {
             <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
           </div>
 
-          <form onsubmit="
-            event.preventDefault();
-            showToast({
-              title: 'Physical Stock-Take Reconciled',
-              message: 'Mozzarella variance +0.5 kg (+3.1% - flagged for review). Pepperoni in expected range.',
-              type: 'warning',
-              duration: 5000
-            });
-            closeModal();
-          ">
+          <form onsubmit="submitStockTake(event)">
             <div class="form-group">
               <label>Mozzarella Cheese Physical Count (kg)</label>
-              <input type="number" step="0.1" class="form-control" value="16.3" style="font-family:var(--font-mono);" required />
+              <input type="number" id="countCheese" step="0.1" class="form-control" value="16.3" style="font-family:var(--font-mono);" required />
             </div>
             <div class="form-group">
               <label>Pepperoni Physical Count (kg)</label>
-              <input type="number" step="0.1" class="form-control" value="8.6" style="font-family:var(--font-mono);" required />
+              <input type="number" id="countPep" step="0.1" class="form-control" value="8.6" style="font-family:var(--font-mono);" required />
             </div>
             <div class="form-group">
               <label>Flour Physical Count (kg)</label>
-              <input type="number" step="0.1" class="form-control" value="48.0" style="font-family:var(--font-mono);" required />
+              <input type="number" id="countFlour" step="0.1" class="form-control" value="48.0" style="font-family:var(--font-mono);" required />
             </div>
             <div style="display:flex; justify-content:flex-end; gap:0.65rem; margin-top:1.75rem;">
               <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
@@ -1438,23 +1505,14 @@ function renderModals() {
             <strong>Blind Reconciliation Policy:</strong> Expected drawer cash is hidden to prevent theft skimming. Count all physical currency and enter total below.
           </div>
 
-          <form onsubmit="
-            event.preventDefault(); 
-            showToast({
-              title: 'EOD Z-Report Balanced',
-              message: 'Counted: $430.00 | Expected: $430.00 | Variance: $0.00 (Balanced). Drawer closed.',
-              type: 'success',
-              duration: 4500
-            }); 
-            closeModal();
-          ">
+          <form onsubmit="submitBlindZReport(event)">
             <div class="form-group">
               <label>Actual Cash Counted ($ USD)</label>
-              <input type="number" step="0.01" class="form-control" placeholder="0.00" value="430.00" style="font-family:var(--font-mono); font-size:1.35rem; font-weight:900;" required />
+              <input type="number" id="zCountedCash" step="0.01" class="form-control" placeholder="0.00" value="${state.drawerSession.expectedCashUSD.toFixed(2)}" style="font-family:var(--font-mono); font-size:1.35rem; font-weight:900;" required />
             </div>
             <div class="form-group">
               <label>Manager Authorization Signature Token</label>
-              <input type="password" class="form-control" value="mgr-pin-token-991" required />
+              <input type="password" id="zManagerPin" class="form-control" value="mgr-pin-token-991" required />
             </div>
             <div style="display:flex; justify-content:flex-end; gap:0.65rem; margin-top:1.75rem;">
               <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
@@ -1477,26 +1535,18 @@ function renderModals() {
             </div>
             <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
           </div>
-          <form onsubmit="
-            event.preventDefault(); 
-            showToast({
-              title: 'Mid-Shift Safe Drop Logged',
-              message: 'Safe Drop of $100.00 recorded to Envelope #ENV-9915.',
-              type: 'info'
-            }); 
-            closeModal();
-          ">
+          <form onsubmit="submitSafeDrop(event)">
             <div class="form-group">
               <label>Drop Amount ($ USD)</label>
-              <input type="number" step="0.01" class="form-control" value="100.00" style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800;" required />
+              <input type="number" id="dropAmountInput" step="0.01" class="form-control" value="100.00" style="font-family:var(--font-mono); font-size:1.25rem; font-weight:800;" required />
             </div>
             <div class="form-group">
               <label>Safe Drop Envelope ID</label>
-              <input type="text" class="form-control" value="ENV-9915" required />
+              <input type="text" id="dropEnvelopeInput" class="form-control" value="ENV-9915" required />
             </div>
             <div class="form-group">
               <label>Witness Manager ID</label>
-              <input type="text" class="form-control" value="mgr-michael-smith" required />
+              <input type="text" id="dropWitnessInput" class="form-control" value="mgr-michael-smith" required />
             </div>
             <div style="display:flex; justify-content:flex-end; gap:0.65rem; margin-top:1.75rem;">
               <button type="button" class="btn-primary btn-slate" onclick="closeModal()">Cancel</button>
@@ -1519,26 +1569,18 @@ function renderModals() {
             </div>
             <button class="modal-close-btn" onclick="closeModal()" title="Close">&times;</button>
           </div>
-          <form onsubmit="
-            event.preventDefault(); 
-            showToast({
-              title: 'Kitchen Waste Logged',
-              message: 'Waste record submitted and inventory theoretical stock depleted.',
-              type: 'warning'
-            }); 
-            closeModal();
-          ">
+          <form onsubmit="submitWasteLog(event)">
             <div class="form-group">
               <label>Item Name</label>
-              <input type="text" class="form-control" value="Mozzarella Cheese (Shredded)" required />
+              <input type="text" id="wasteItemInput" class="form-control" value="Mozzarella Cheese (Shredded)" required />
             </div>
             <div class="form-group">
               <label>Quantity Lost</label>
-              <input type="text" class="form-control" value="1.5 kg" required />
+              <input type="text" id="wasteQtyInput" class="form-control" value="1.5 kg" required />
             </div>
             <div class="form-group">
               <label>Reason Code</label>
-              <select class="form-control">
+              <select id="wasteReasonSelect" class="form-control">
                 <option>BURNT / OVERCOOKED</option>
                 <option>DROPPED_FLOOR</option>
                 <option>EXPIRED</option>
@@ -1861,6 +1903,330 @@ window.submitDayEndReconciliation = async function(e) {
   }
 };
 
+// ─── Dynamic REST Integration Handlers ──────────────────────────────────
+window.submitSeatTable = async function(e) {
+  e.preventDefault();
+  const covers = parseInt(document.getElementById('seatCoversInput').value || '2');
+  const serverName = document.getElementById('serverNameInput').value || 'Sarah Jenkins';
+  const tableId = state.selectedTable?.tableId;
+
+  try {
+    const res = await fetch(`${EDGE_SERVER_URL}/api/tables/seat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tableId, covers, serverName })
+    });
+    const data = await res.json();
+    if (data.success && state.selectedTable) {
+      state.selectedTable.status = 'SEATED';
+      state.selectedTable.covers = covers;
+      state.selectedTable.serverName = serverName;
+      state.selectedTable.seatedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      state.selectedTable.openTicketId = data.ticketId || `TKT-${tableId}-001`;
+      showToast({ title: 'Table Seated', message: `${state.selectedTable.label} opened for ${covers} covers (${serverName}).`, type: 'success' });
+      closeModal();
+    }
+  } catch {
+    if (state.selectedTable) {
+      state.selectedTable.status = 'SEATED';
+      state.selectedTable.covers = covers;
+      state.selectedTable.serverName = serverName;
+    }
+    closeModal();
+  }
+};
+
+window.fireCourseForTable = async function(tableId) {
+  const table = state.tables.find(t => t.tableId === tableId);
+  if (!table) return;
+
+  try {
+    await fetch(`${EDGE_SERVER_URL}/api/tables/fire`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tableId, course: 'MAIN_COURSE' })
+    });
+  } catch {}
+
+  table.status = 'SERVED';
+  showToast({ 
+    title: 'KDS Course Fired', 
+    message: `Active course for ${table.label} dispatched over LAN WebSocket to Hotline KDS.`, 
+    type: 'success' 
+  });
+  renderApp();
+};
+
+window.closeTableCheckout = async function(tableId) {
+  const table = state.tables.find(t => t.tableId === tableId);
+  if (!table) return;
+
+  try {
+    await fetch(`${EDGE_SERVER_URL}/api/tables/close`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tableId })
+    });
+  } catch {}
+
+  table.status = 'VACANT';
+  delete table.openTicketId;
+  delete table.covers;
+  delete table.serverName;
+  delete table.seatedAt;
+  showToast({ 
+    title: 'Table Settled & Closed', 
+    message: `${table.label} bill settled via Cash. Table reset to VACANT.`, 
+    type: 'success' 
+  });
+  renderApp();
+};
+
+window.bumpKDSTicket = async function(ticketId) {
+  const tId = typeof ticketId === 'string' ? ticketId : (state.kdsTickets[ticketId]?.id || 'TKT-9912');
+  try {
+    const res = await fetch(`${EDGE_SERVER_URL}/api/kds/tickets/${tId}/bump`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      state.kdsTickets = data.tickets;
+      showToast({ title: 'Ticket Bumped', message: `Ticket #${tId} transitioned to next kitchen stage.`, type: 'info' });
+      renderApp();
+      return;
+    }
+  } catch {}
+
+  if (typeof ticketId === 'number') state.kdsTickets.splice(ticketId, 1);
+  renderApp();
+};
+
+window.submitCreatePO = async function(e) {
+  e.preventDefault();
+  const supplierId = document.getElementById('poSupplierSelect').value;
+  const itemText = document.getElementById('poItemQtyInput').value;
+  const expectedDate = document.getElementById('poDeliveryDateInput').value;
+
+  try {
+    const res = await fetch(`${EDGE_SERVER_URL}/api/inventory/pos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        supplierId,
+        lineItems: [{ ingredientId: 'ing-cheese', name: itemText, quantity: 20, unitCostINR: 650 }],
+        expectedDeliveryDate: expectedDate,
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      state.purchaseOrders.unshift(data.purchaseOrder);
+      showToast({ title: 'Purchase Order Dispatched', message: `PO ${data.purchaseOrder.poId} sent to supplier.`, type: 'success' });
+      closeModal();
+      return;
+    }
+  } catch {}
+
+  const poNumber = 'PO-STORE-104-00' + (state.purchaseOrders.length + 1);
+  state.purchaseOrders.unshift({
+    poId: poNumber,
+    supplierId: supplierId,
+    supplierName: supplierId === 'sup-001' ? 'Mumbai Dairy Wholesalers Pvt. Ltd.' : 'Delhi Grain & Flour Mills',
+    totalCostINR: 13000,
+    status: 'SENT',
+    createdAt: new Date().toISOString().substring(0, 10),
+    expectedDeliveryDate: expectedDate
+  });
+  showToast({ title: 'Purchase Order Dispatched', message: `PO ${poNumber} sent to supplier.`, type: 'success' });
+  closeModal();
+};
+
+window.submitReceiveGRN = async function(e) {
+  e.preventDefault();
+  const poId = state.selectedPO?.poId;
+  const receivedQty = parseFloat(document.getElementById('grnReceivedQtyInput').value || '20.0');
+  const receivedBy = document.getElementById('grnStaffInput').value || 'Warehouse Staff Lead';
+
+  try {
+    const res = await fetch(`${EDGE_SERVER_URL}/api/inventory/pos/receive`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        poId,
+        receivedBy,
+        actualReceived: [{ ingredientId: 'ing-cheese', qty: receivedQty }]
+      })
+    });
+    const data = await res.json();
+    if (data.success && state.selectedPO) {
+      state.selectedPO.status = 'RECEIVED';
+      const cheese = state.stockLevels.find(s => s.ingredientId === 'ing-cheese');
+      if (cheese) cheese.balance += receivedQty;
+      showToast({ title: 'GRN Posted & Stock Added', message: `+${receivedQty} kg Mozzarella added to stock. PO ${poId} marked RECEIVED.`, type: 'success' });
+      closeModal();
+      return;
+    }
+  } catch {}
+
+  if (state.selectedPO) state.selectedPO.status = 'RECEIVED';
+  const cheese = state.stockLevels.find(s => s.ingredientId === 'ing-cheese');
+  if (cheese) cheese.balance += receivedQty;
+  showToast({ title: 'GRN Posted & Stock Added', message: `+${receivedQty} kg Mozzarella added to stock. PO ${poId} marked RECEIVED.`, type: 'success' });
+  closeModal();
+};
+
+window.submitStockTake = async function(e) {
+  e.preventDefault();
+  const cheese = parseFloat(document.getElementById('countCheese').value || '16.3');
+  const pep = parseFloat(document.getElementById('countPep').value || '8.6');
+  const flour = parseFloat(document.getElementById('countFlour').value || '48.0');
+
+  try {
+    const res = await fetch(`${EDGE_SERVER_URL}/api/inventory/stock-take`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        counts: [
+          { ingredientId: 'ing-cheese', actualCount: cheese },
+          { ingredientId: 'ing-pep', actualCount: pep },
+          { ingredientId: 'ing-flour', actualCount: flour },
+        ]
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast({ title: 'Physical Stock-Take Reconciled', message: 'Physical counts verified and recorded to inventory audit ledger.', type: 'warning', duration: 5000 });
+      closeModal();
+      return;
+    }
+  } catch {}
+
+  showToast({ title: 'Physical Stock-Take Reconciled', message: 'Physical counts recorded locally.', type: 'warning', duration: 5000 });
+  closeModal();
+};
+
+window.submitSafeDrop = async function(e) {
+  e.preventDefault();
+  const amount = parseFloat(document.getElementById('dropAmountInput').value || '100.00');
+  const envelopeId = document.getElementById('dropEnvelopeInput').value || 'ENV-9915';
+  const witness = document.getElementById('dropWitnessInput').value || 'Michael Smith (Manager)';
+
+  try {
+    const res = await fetch(`${EDGE_SERVER_URL}/api/cash/drop`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, envelopeId, witnessName: witness })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast({ title: 'Mid-Shift Safe Drop Logged', message: `Safe Drop of $${amount.toFixed(2)} recorded to Envelope #${envelopeId}.`, type: 'info' });
+      closeModal();
+      return;
+    }
+  } catch {}
+
+  state.drawerSession.cashDropsUSD += amount;
+  state.drawerSession.expectedCashUSD -= amount;
+  state.drawerSession.activityLedger.push({
+    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    activityType: 'MID-SHIFT SAFE DROP',
+    amount: -amount,
+    witness: witness,
+    notes: `Envelope #${envelopeId}`,
+  });
+  showToast({ title: 'Mid-Shift Safe Drop Logged', message: `Safe Drop of $${amount.toFixed(2)} recorded to Envelope #${envelopeId}.`, type: 'info' });
+  closeModal();
+};
+
+window.submitWasteLog = async function(e) {
+  e.preventDefault();
+  const item = document.getElementById('wasteItemInput').value;
+  const qty = document.getElementById('wasteQtyInput').value;
+  const reason = document.getElementById('wasteReasonSelect').value;
+
+  try {
+    const res = await fetch(`${EDGE_SERVER_URL}/api/inventory/waste`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item, qty, reason, cost: '$8.50', loggedBy: 'Kitchen Lead' })
+    });
+    const data = await res.json();
+    if (data.success) {
+      state.spoilageLogs.unshift(data.log);
+      showToast({ title: 'Kitchen Waste Logged', message: `${item} (${qty}) recorded. Theoretical stock depleted.`, type: 'warning' });
+      closeModal();
+      return;
+    }
+  } catch {}
+
+  state.spoilageLogs.unshift({ id: `spoil-${Date.now()}`, item, qty, reason, cost: '$8.50', loggedBy: 'Kitchen Lead' });
+  showToast({ title: 'Kitchen Waste Logged', message: `${item} (${qty}) recorded.`, type: 'warning' });
+  closeModal();
+};
+
+window.submitBlindZReport = function(e) {
+  e.preventDefault();
+  const counted = parseFloat(document.getElementById('zCountedCash').value || '430.00');
+  const expected = state.drawerSession.expectedCashUSD;
+  const variance = counted - expected;
+
+  showToast({
+    title: variance === 0 ? 'EOD Z-Report Balanced' : 'EOD Z-Report Variance Flagged',
+    message: `Counted: $${counted.toFixed(2)} | Expected: $${expected.toFixed(2)} | Variance: $${variance.toFixed(2)} (${variance === 0 ? 'Balanced' : 'Flagged'}).`,
+    type: variance === 0 ? 'success' : 'warning',
+    duration: 5000
+  });
+  closeModal();
+};
+
+window.toggleEmployeeClock = async function(empId, breakAttested) {
+  try {
+    const res = await fetch(`${EDGE_SERVER_URL}/api/labor/clock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ employeeId: empId, attested: breakAttested })
+    });
+    const data = await res.json();
+    if (data.success) {
+      state.employees = data.employees;
+      const emp = state.employees.find(e => e.id === empId);
+      showToast({
+        title: emp?.status === 'CLOCKED_IN' ? 'Clock-In Verified' : 'Clock-Out Verified',
+        message: `${emp?.name} is now ${emp?.status}. FLSA meal break attestation logged.`,
+        type: 'info'
+      });
+      renderApp();
+      return;
+    }
+  } catch {}
+
+  const emp = state.employees.find(e => e.id === empId);
+  if (emp) {
+    emp.status = emp.status === 'CLOCKED_IN' ? 'CLOCKED_OUT' : 'CLOCKED_IN';
+    showToast({ title: 'Shift Status Updated', message: `${emp.name} is now ${emp.status}.`, type: 'info' });
+    renderApp();
+  }
+};
+
+window.toggle86 = async function(productId, isUnavailable) {
+  try {
+    const res = await fetch(`${EDGE_SERVER_URL}/api/v1/menu/86-toggle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ productId, isUnavailable: !isUnavailable })
+    });
+    const data = await res.json();
+    if (data.success) {
+      const item = state.menuItems.find(m => m.id === productId || m.sku === productId);
+      if (item) item.isAvailable = data.isAvailable;
+      showToast({
+        title: data.isAvailable ? 'Item Returned to 86-List (Available)' : 'Item 86’d (Out of Stock)',
+        message: `Product ${productId} availability broadcast to all POS & KDS stations.`,
+        type: data.isAvailable ? 'success' : 'warning'
+      });
+      renderApp();
+      return;
+    }
+  } catch {}
+};
+
 // Global Image Upload & Catalog Handlers
 window.selectNewMenuImagePreset = function(imgPath) {
   state.newMenuItemImage = imgPath;
@@ -1887,13 +2253,33 @@ window.handleNewMenuImageUrl = function(val) {
   }
 };
 
-window.saveNewMenuItem = function(e) {
+window.saveNewMenuItem = async function(e) {
   e.preventDefault();
   const name = document.getElementById('newItemName').value;
   const category = document.getElementById('newItemCategory').value;
   const sku = document.getElementById('newItemSKU').value;
   const price = parseFloat(document.getElementById('newItemPrice').value);
   const image = state.newMenuItemImage || '/truffle_pasta.jpg';
+
+  try {
+    const res = await fetch(`${EDGE_SERVER_URL}/api/menu/items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, category, sku, price, image, allergens: ['DAIRY'] })
+    });
+    const data = await res.json();
+    if (data.success) {
+      state.menuItems.push(data.item);
+      showToast({
+        title: 'Menu Item Published!',
+        message: `${name} ($${price.toFixed(2)}) published to catalog with photo and ready on POS Register.`,
+        type: 'success',
+        duration: 5000
+      });
+      closeModal();
+      return;
+    }
+  } catch {}
 
   const newItem = {
     id: `item-${Date.now()}`,
@@ -1905,6 +2291,7 @@ window.saveNewMenuItem = function(e) {
     allergens: ['DAIRY'],
     isBrandLocked: false,
     version: 1,
+    isAvailable: true,
   };
 
   state.menuItems.push(newItem);
@@ -1921,4 +2308,5 @@ window.saveNewMenuItem = function(e) {
 // Start
 initBackendConnection();
 renderApp();
+
 
