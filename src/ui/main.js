@@ -130,7 +130,7 @@ async function apiFetch(endpoint, options = {}) {
   const id = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const res = await apiFetch(`${EDGE_SERVER_URL}${endpoint}`, {
+    const res = await fetch(`${EDGE_SERVER_URL}${endpoint}`, {
       ...options,
       signal: controller.signal,
       headers: {
