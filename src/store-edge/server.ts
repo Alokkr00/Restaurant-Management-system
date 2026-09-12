@@ -547,6 +547,49 @@ app.get(['/', '/health'], (req, res) => {
   return res.send(html);
 });
 
+// Programmatic JSON Health Endpoint
+app.get('/api/health', (req, res) => {
+  const pendingCount = (countPendingSyncStmt.get() as any).count;
+  res.json({
+    status: 'ONLINE',
+    storeId: STORE_NODE_ID,
+    sqliteWalMode: true,
+    mode: isCloudConnected ? 'CLOUD_SYNCED' : 'OFFLINE_EDGE_OPERATIONAL',
+    cloudConnected: isCloudConnected,
+    pendingOfflineTxs: pendingCount,
+    lastSyncTimestamp,
+    syncCycleCount,
+    syncWorkerActive: true,
+    kdsConnectedClients: wss.clients.size,
+  });
+});
+
+// Manual Cloud Sync Trigger Endpoint
+app.post('/api/sync/trigger', async (req, res) => {
+  try {
+    const result = await runCloudSyncWorkerCycle();
+    const pendingCount = (countPendingSyncStmt.get() as any).count;
+    res.json({
+      success: true,
+      flushedCount: result.flushedCount,
+      remainingPending: pendingCount,
+      message: `Flushed ${result.flushedCount} offline records to cloud`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// WAN State Toggle Simulation Endpoint (for chaos testing & dashboard)
+app.post('/api/network/toggle', (req, res) => {
+  isCloudConnected = !isCloudConnected;
+  res.json({
+    success: true,
+    cloudConnected: isCloudConnected,
+    mode: isCloudConnected ? 'CLOUD_SYNCED' : 'OFFLINE_EDGE_OPERATIONAL',
+  });
+});
+
 // ─── Production Core API Endpoints (v1) ──────────────────────────────────
 // 1. Employee Login with PIN
 app.post('/api/v1/auth/login', (req, res) => {

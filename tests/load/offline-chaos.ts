@@ -24,7 +24,9 @@ async function post(path: string, body?: unknown) {
 }
 
 async function get(path: string) {
-  const res = await fetch(`${EDGE_URL}${path}`);
+  const res = await fetch(`${EDGE_URL}${path}`, {
+    headers: { 'Accept': 'application/json' },
+  });
   return { status: res.status, body: await res.json().catch(() => ({})) };
 }
 
