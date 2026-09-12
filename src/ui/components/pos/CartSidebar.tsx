@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
-import { Trash2, Plus, Minus, CreditCard, Banknote, Utensils } from 'lucide-react';
+import { Trash2, Plus, Minus, CreditCard, Banknote, Utensils, AlertCircle } from 'lucide-react';
 
 export const CartSidebar: React.FC = () => {
   const {
@@ -14,6 +14,17 @@ export const CartSidebar: React.FC = () => {
     setActiveModule
   } = useStore();
 
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [lastChangeDue, setLastChangeDue] = useState<number | null>(null);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+
+  // Clear the change due banner when a new item is added to cart
+  useEffect(() => {
+    if (cart.length > 0 && lastChangeDue !== null) {
+      setLastChangeDue(null);
+    }
+  }, [cart.length]);
+
   const subtotal = cart.reduce(
     (sum, item) => sum + (item.basePrice + (item.modifiersCost || 0)) * item.qty,
     0
@@ -21,9 +32,35 @@ export const CartSidebar: React.FC = () => {
   const tax = subtotal * 0.08;
   const total = subtotal + tax;
 
+  const nextDollar = Math.ceil(total);
+
   const handleQuickAddFirst = () => {
     if (menuItems.length > 0) {
       addToCart(menuItems[0]);
+    }
+  };
+
+  const handleQuickCash = async (tendered: number) => {
+    if (tendered < total) return;
+    setIsCheckingOut(true);
+    const change = Math.max(0, tendered - total);
+    try {
+      await quickCashCheckout(tendered);
+      setLastChangeDue(change);
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
+
+  const handleCheckout = async (method: 'CARD' | 'CASH') => {
+    setIsCheckingOut(true);
+    try {
+      await checkoutCart(method);
+      if (method === 'CASH') {
+        setLastChangeDue(0);
+      }
+    } finally {
+      setIsCheckingOut(false);
     }
   };
 
@@ -35,15 +72,38 @@ export const CartSidebar: React.FC = () => {
           <h3 className="cart-header-title">Current Ticket</h3>
           <span className="cart-header-subtitle">Dine In &bull; Terminal 01</span>
         </div>
-        <button
-          className="btn-clear-cart"
-          disabled={cart.length === 0}
-          onClick={clearCart}
-          title="Clear Ticket"
-        >
-          <Trash2 size={13} />
-          <span>Clear</span>
-        </button>
+        {!showClearConfirm ? (
+          <button
+            className="btn-clear-cart"
+            disabled={cart.length === 0}
+            onClick={() => setShowClearConfirm(true)}
+            title="Clear Ticket"
+          >
+            <Trash2 size={13} />
+            <span>Clear</span>
+          </button>
+        ) : (
+          <div className="confirm-clear-box">
+            <span className="confirm-clear-text">Clear {cart.length} item{cart.length > 1 ? 's' : ''}?</span>
+            <div className="confirm-clear-actions">
+              <button
+                className="btn-confirm-yes"
+                onClick={() => {
+                  clearCart();
+                  setShowClearConfirm(false);
+                }}
+              >
+                Yes
+              </button>
+              <button
+                className="btn-confirm-no"
+                onClick={() => setShowClearConfirm(false)}
+              >
+                No
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Scrollable Ticket Items */}
@@ -116,37 +176,63 @@ export const CartSidebar: React.FC = () => {
 
       {/* Pinned Bottom Controls (Always Visible on Any Screen Height) */}
       <div className="cart-footer-pinned">
+        {/* Persistent Change Due Banner */}
+        {lastChangeDue !== null && (
+          <div className="change-due-banner">
+            <div>
+              <div className="change-due-label">Cash Tendered &bull; Change Due</div>
+              <div className="change-due-amount">${lastChangeDue.toFixed(2)}</div>
+            </div>
+            <button
+              className="btn-clear-cart"
+              onClick={() => setLastChangeDue(null)}
+              title="Dismiss change due notice"
+            >
+              <span>Dismiss</span>
+            </button>
+          </div>
+        )}
+
         {/* Quick Cash Tender Bar */}
         <div className="quick-cash-bar">
           <div className="quick-cash-title">Quick Cash Tender</div>
           <div className="quick-cash-buttons">
             <button
-              className="btn-cash-quick"
-              disabled={cart.length === 0 || total > 10}
-              onClick={() => quickCashCheckout(10)}
+              className="btn-cash-quick exact"
+              disabled={cart.length === 0 || isCheckingOut}
+              onClick={() => handleQuickCash(total)}
             >
-              $10
+              Exact
             </button>
+            {nextDollar > total && (
+              <button
+                className="btn-cash-quick"
+                disabled={cart.length === 0 || isCheckingOut}
+                onClick={() => handleQuickCash(nextDollar)}
+              >
+                ${nextDollar}
+              </button>
+            )}
             <button
               className="btn-cash-quick"
-              disabled={cart.length === 0 || total > 20}
-              onClick={() => quickCashCheckout(20)}
+              disabled={cart.length === 0 || total > 20 || isCheckingOut}
+              onClick={() => handleQuickCash(20)}
             >
               $20
             </button>
             <button
               className="btn-cash-quick"
-              disabled={cart.length === 0 || total > 50}
-              onClick={() => quickCashCheckout(50)}
+              disabled={cart.length === 0 || total > 50 || isCheckingOut}
+              onClick={() => handleQuickCash(50)}
             >
               $50
             </button>
             <button
-              className="btn-cash-quick exact"
-              disabled={cart.length === 0}
-              onClick={() => quickCashCheckout(total)}
+              className="btn-cash-quick"
+              disabled={cart.length === 0 || total > 100 || isCheckingOut}
+              onClick={() => handleQuickCash(100)}
             >
-              Exact
+              $100
             </button>
           </div>
         </div>
@@ -170,20 +256,20 @@ export const CartSidebar: React.FC = () => {
         {/* Checkout Actions */}
         <div className="checkout-actions-grid">
           <button
-            className="btn-checkout btn-charge"
-            disabled={cart.length === 0}
-            onClick={() => checkoutCart('CARD')}
+            className={`btn-checkout btn-charge ${isCheckingOut ? 'btn-loading' : ''}`}
+            disabled={cart.length === 0 || isCheckingOut}
+            onClick={() => handleCheckout('CARD')}
           >
-            <CreditCard size={15} />
-            <span>Charge Card</span>
+            {isCheckingOut ? <span className="spin-loader" /> : <CreditCard size={18} />}
+            <span>{isCheckingOut ? 'Authorizing...' : 'Charge Card'}</span>
           </button>
           <button
-            className="btn-checkout btn-cash"
-            disabled={cart.length === 0}
-            onClick={() => checkoutCart('CASH')}
+            className={`btn-checkout btn-cash ${isCheckingOut ? 'btn-loading' : ''}`}
+            disabled={cart.length === 0 || isCheckingOut}
+            onClick={() => handleCheckout('CASH')}
           >
-            <Banknote size={15} />
-            <span>Cash Tender</span>
+            {isCheckingOut ? <span className="spin-loader" /> : <Banknote size={18} />}
+            <span>{isCheckingOut ? 'Tendering...' : 'Cash Tender'}</span>
           </button>
         </div>
       </div>

@@ -4,32 +4,108 @@
    ========================================================================== */
 
 :root {
+  /* Surface & Background Hierarchy */
   --bg-app: #090e17;
   --bg-surface: #0f172a;
   --bg-card: #1e293b;
   --bg-elevated: #334155;
+  --bg-input: #0b1120;
 
+  /* High-Contrast Border System */
   --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.16);
+  --border-strong: rgba(255, 255, 255, 0.18);
   --border-active: #38bdf8;
+  --border-focus: #0284c7;
 
+  /* Typography Colors (WCAG AAA High Contrast) */
   --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --text-dim: #64748b;
+  --text-muted: #cbd5e1;       /* Promoted from #94a3b8 for 8.5:1 contrast */
+  --text-dim: #94a3b8;         /* Promoted from #64748b for 5.3:1 contrast */
+  --text-inverse: #090e17;
 
-  --accent-blue: #3b82f6;
-  --accent-emerald: #10b981;
-  --accent-amber: #f59e0b;
-  --accent-rose: #f43f5e;
-  --accent-purple: #8b5cf6;
+  /* Semantic Accent Colors */
+  --accent-blue: #0284c7;
+  --accent-blue-hover: #0369a1;
+  --accent-emerald: #059669;
+  --accent-emerald-hover: #047857;
+  --accent-amber: #d97706;
+  --accent-amber-hover: #b45309;
+  --accent-rose: #e11d48;
+  --accent-rose-hover: #be123c;
+  --accent-purple: #7c3aed;
 
-  --font-main: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-display: 'Outfit', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  /* Modular Typography Scale (1.250 Major Third) */
+  --text-2xs: 0.7rem;          /* 11.2px - Micro tags */
+  --text-xs: 0.75rem;          /* 12px - Meta text */
+  --text-sm: 0.85rem;          /* 13.6px - Captions / Table cells */
+  --text-base: 1rem;           /* 16px - Primary Body / Touch Button text */
+  --text-lg: 1.15rem;          /* 18.4px - Section Subtitles */
+  --text-xl: 1.35rem;          /* 21.6px - Workspace Titles */
+  --text-2xl: 1.65rem;         /* 26.4px - KPI Metrics */
+  --text-3xl: 2rem;            /* 32px - Change Due / Primary Cash Total */
 
+  /* Standard Vertical Rhythm & Spacing Scale */
+  --space-1: 0.25rem;          /* 4px */
+  --space-2: 0.5rem;           /* 8px */
+  --space-3: 0.75rem;          /* 12px */
+  --space-4: 1rem;             /* 16px */
+  --space-5: 1.25rem;          /* 20px */
+  --space-6: 1.5rem;           /* 24px */
+  --space-8: 2rem;             /* 32px */
+
+  /* Elevation & Shadow System */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.6);
+  --shadow-modal: 0 20px 50px rgba(0, 0, 0, 0.8);
+  --shadow-sticky: 0 -4px 20px rgba(0, 0, 0, 0.6);
+
+  /* Geometry Radii */
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
+  --radius-pill: 9999px;
+
+  /* Typography Families */
+  --font-main: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Outfit', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+/* Accessible Skip Link (Screen Readers & Keyboard Navigation) */
+.skip-link {
+  position: absolute;
+  top: -60px;
+  left: 1rem;
+  background: var(--accent-blue);
+  color: #ffffff;
+  padding: 0.5rem 1rem;
+  font-weight: 800;
+  font-size: var(--text-sm);
+  border-radius: var(--radius-sm);
+  z-index: 99999;
+  transition: top 0.2s ease;
+  text-decoration: none;
+}
+.skip-link:focus {
+  top: 10px;
+  outline: 2px solid #ffffff;
+}
+
+/* Global Focus Rings (WCAG 2.4.7 Focus Visible) */
+:focus-visible {
+  outline: 2px solid var(--border-active);
+  outline-offset: 2px;
+}
+
+/* Vestibular Safety: Respect Reduced Motion Preferences */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Reset & Box Sizing */
@@ -441,13 +517,17 @@ html, body {
   display: flex;
   flex-direction: column;
   transition: all 0.15s ease;
-  min-height: 185px;
+  min-height: 195px;
   user-select: none;
 }
 
 .pos-card:hover {
   border-color: var(--border-active);
   transform: translateY(-2px);
+}
+
+.pos-card:active {
+  transform: scale(0.98);
 }
 
 .pos-card-disabled {
@@ -458,9 +538,11 @@ html, body {
 .pos-card-img-wrapper {
   position: relative;
   width: 100%;
-  height: 95px;
+  aspect-ratio: 16 / 9;
+  height: 98px;
   overflow: hidden;
   cursor: pointer;
+  background: #0b1120;
 }
 
 .pos-card-img {
@@ -477,7 +559,7 @@ html, body {
 .card-86-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(244, 63, 94, 0.85);
+  background: rgba(225, 29, 72, 0.88);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -489,7 +571,7 @@ html, body {
 }
 
 .pos-card-body {
-  padding: 0.35rem 0.6rem;
+  padding: 0.4rem 0.6rem;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -501,11 +583,16 @@ html, body {
   font-weight: 800;
   font-size: 0.85rem;
   color: #ffffff;
-  line-height: 1.15;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.1em;
 }
 
 .pos-card-meta {
-  font-size: 0.65rem;
+  font-size: 0.68rem;
   color: var(--text-dim);
   margin-top: 0.1rem;
 }
@@ -730,76 +817,161 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 0.15rem;
+  margin-top: 0.25rem;
 }
 
 .qty-control {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.5rem;
 }
 
 .qty-btn {
-  width: 26px;
-  height: 26px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   background: var(--bg-elevated);
-  border: 1px solid var(--border-strong);
+  border: 1.5px solid var(--border-strong);
   color: #ffffff;
   border-radius: var(--radius-sm);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: all 0.15s ease;
 }
 
 .qty-btn:hover {
   background: var(--accent-blue);
+  border-color: var(--accent-blue);
+}
+
+.qty-btn:active {
+  transform: scale(0.92);
 }
 
 .qty-val {
   font-family: var(--font-mono);
   font-weight: 900;
-  font-size: 0.92rem;
-  width: 22px;
+  font-size: 1.1rem;
+  width: 28px;
   text-align: center;
+  color: #ffffff;
 }
 
 .unit-price-tag {
-  font-size: 0.7rem;
-  color: var(--text-dim);
+  font-size: 0.75rem;
+  color: var(--text-muted);
   font-family: var(--font-mono);
 }
 
-/* Pinned Footer */
+/* Persistent Change Due Banner */
+.change-due-banner {
+  background: rgba(5, 150, 105, 0.2);
+  border: 2px solid var(--accent-emerald);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+  animation: slide-up 0.25s ease;
+}
+
+.change-due-label {
+  font-size: var(--text-xs);
+  font-weight: 900;
+  color: #ffffff;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.change-due-amount {
+  font-family: var(--font-mono);
+  font-size: 1.45rem;
+  font-weight: 900;
+  color: #34d399;
+}
+
+/* Inline Confirm Clear Box */
+.confirm-clear-box {
+  background: rgba(225, 29, 72, 0.18);
+  border: 1.5px solid var(--accent-rose);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  animation: slide-up 0.15s ease;
+}
+
+.confirm-clear-text {
+  font-size: var(--text-xs);
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.confirm-clear-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.btn-confirm-yes {
+  background: var(--accent-rose);
+  color: #ffffff;
+  border: none;
+  font-size: var(--text-xs);
+  font-weight: 800;
+  padding: 0.25rem 0.55rem;
+  min-height: 28px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.btn-confirm-no {
+  background: var(--bg-elevated);
+  color: #ffffff;
+  border: 1px solid var(--border-subtle);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  padding: 0.25rem 0.55rem;
+  min-height: 28px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+/* Pinned Footer (Always Bounded & Visible) */
 .cart-footer-pinned {
   flex-shrink: 0;
   background: #090e1a;
   border-top: 1.5px solid var(--border-strong);
-  padding: 0.45rem 0.75rem;
+  padding: 0.5rem 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.4);
+  gap: 0.25rem;
+  box-shadow: var(--shadow-sticky);
 }
 
 .quick-cash-bar {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.2rem;
 }
 
 .quick-cash-title {
-  font-size: 0.65rem;
+  font-size: 0.68rem;
   font-weight: 800;
-  color: var(--text-muted);
+  color: var(--text-dim);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .quick-cash-buttons {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.25rem;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.3rem;
 }
 
 .btn-cash-quick {
@@ -808,12 +980,15 @@ html, body {
   color: #ffffff;
   font-family: var(--font-mono);
   font-weight: 900;
-  font-size: 0.85rem;
-  padding: 0.25rem 0;
-  min-height: 32px;
+  font-size: 0.95rem;
+  padding: 0.35rem 0;
+  min-height: 48px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-cash-quick:hover:not(:disabled) {
@@ -822,27 +997,33 @@ html, body {
   transform: translateY(-1px);
 }
 
+.btn-cash-quick:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
 .btn-cash-quick.exact {
   font-family: var(--font-display);
+  font-size: 0.85rem;
 }
 
 .btn-cash-quick:disabled {
-  opacity: 0.3;
+  opacity: 0.25;
   cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.06);
 }
 
 .cart-totals-summary {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
-  margin-top: 0.15rem;
+  gap: 0.2rem;
+  margin-top: 0.2rem;
 }
 
 .totals-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   color: var(--text-muted);
 }
 
@@ -852,10 +1033,10 @@ html, body {
 }
 
 .totals-row.total-due {
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   font-weight: 900;
   color: #34d399;
-  padding-top: 0.15rem;
+  padding-top: 0.2rem;
   border-top: 1.5px solid var(--border-strong);
   font-family: var(--font-mono);
 }
@@ -867,22 +1048,23 @@ html, body {
 .checkout-actions-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.35rem;
-  margin-top: 0.15rem;
+  gap: 0.4rem;
+  margin-top: 0.25rem;
 }
 
 .btn-checkout {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.35rem;
-  min-height: 38px;
-  font-size: 0.88rem;
+  gap: 0.45rem;
+  min-height: 58px;
+  font-size: 1.05rem;
   font-weight: 800;
   border: none;
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s ease;
+  user-select: none;
 }
 
 .btn-charge {
@@ -890,14 +1072,21 @@ html, body {
   color: #ffffff;
 }
 
+.btn-charge:hover:not(:disabled) {
+  background: var(--accent-blue-hover);
+}
+
 .btn-cash {
   background: var(--accent-emerald);
   color: #ffffff;
 }
 
-.btn-checkout:hover:not(:disabled) {
-  transform: translateY(-1px);
-  filter: brightness(1.1);
+.btn-cash:hover:not(:disabled) {
+  background: var(--accent-emerald-hover);
+}
+
+.btn-checkout:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .btn-checkout:disabled {
@@ -982,71 +1171,91 @@ html, body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  transition: all 0.15s ease;
 }
 
 .kds-card-late {
-  border-color: var(--accent-rose);
-  box-shadow: 0 0 16px rgba(244, 63, 94, 0.25);
+  border-color: #dc2626;
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.35);
+  animation: pulse-border 1.5s infinite;
 }
 
 .kds-card-header {
-  padding: 0.6rem 0.85rem;
-  background: rgba(255, 255, 255, 0.03);
+  padding: 0.65rem 0.85rem;
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  transition: background-color 0.2s ease;
+}
+
+.kds-card-header.header-normal {
+  background: #065f46;
+  color: #ffffff;
+}
+
+.kds-card-header.header-warning {
+  background: #b45309;
+  color: #ffffff;
+}
+
+.kds-card-header.header-late {
+  background: #b91c1c;
+  color: #ffffff;
 }
 
 .kds-ticket-id {
   font-family: var(--font-mono);
   font-weight: 900;
-  font-size: 0.95rem;
+  font-size: 1rem;
   color: #ffffff;
 }
 
 .kds-source-tag {
-  font-size: 0.68rem;
-  color: var(--text-dim);
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
 }
 
 .kds-timer-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.35rem;
   font-family: var(--font-mono);
-  font-size: 0.75rem;
-  font-weight: 800;
-  padding: 0.2rem 0.5rem;
+  font-size: 0.82rem;
+  font-weight: 900;
+  padding: 0.25rem 0.6rem;
   border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.3);
+  color: #ffffff;
 }
 
 .timer-normal {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
+  background: rgba(16, 185, 129, 0.25);
+  color: #a7f3d0;
 }
 
 .timer-warning {
-  background: rgba(245, 158, 11, 0.15);
-  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.25);
+  color: #fde68a;
 }
 
 .timer-late {
-  background: rgba(244, 63, 94, 0.2);
-  color: #fb7185;
+  background: rgba(220, 38, 38, 0.35);
+  color: #ffffff;
   animation: pulse-border 1.5s infinite;
 }
 
 @keyframes pulse-border {
-  50% { opacity: 0.7; }
+  50% { opacity: 0.75; }
 }
 
 .late-tag {
-  background: var(--accent-rose);
-  color: #ffffff;
-  font-size: 0.6rem;
+  background: #ffffff;
+  color: #b91c1c;
+  font-size: 0.65rem;
   font-weight: 900;
-  padding: 1px 4px;
+  padding: 1px 5px;
   border-radius: 4px;
 }
 
@@ -1054,102 +1263,110 @@ html, body {
   display: flex;
   gap: 0.35rem;
   padding: 0.4rem 0.85rem;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.25);
 }
 
 .station-badge {
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   font-weight: 800;
   background: var(--bg-elevated);
   color: #ffffff;
-  padding: 1px 6px;
+  padding: 2px 7px;
   border-radius: 4px;
 }
 
 .dining-type-badge {
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   font-weight: 800;
   background: rgba(56, 189, 248, 0.15);
   color: #38bdf8;
-  padding: 1px 6px;
+  padding: 2px 7px;
   border-radius: 4px;
 }
 
 .kds-items-list {
-  padding: 0.6rem 0.85rem;
+  padding: 0.75rem 0.85rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.6rem;
   flex: 1;
 }
 
 .kds-item-title-row {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.45rem;
 }
 
 .kds-qty-pill {
   font-family: var(--font-mono);
   font-weight: 900;
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   background: var(--accent-blue);
   color: #ffffff;
-  padding: 1px 6px;
+  padding: 2px 7px;
   border-radius: 4px;
 }
 
 .kds-item-name {
   font-weight: 800;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   color: #ffffff;
 }
 
 .kds-modifiers-box {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.3rem;
-  padding-left: 1.8rem;
+  gap: 0.35rem;
+  padding-left: 2rem;
   margin-top: 0.15rem;
 }
 
 .kds-mod-tag {
-  font-size: 0.72rem;
+  font-size: 0.78rem;
+  font-weight: 700;
   color: #fde68a;
 }
 
+/* Life-Safety Allergen Banner */
 .kds-allergens-box {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.3rem;
-  font-size: 0.68rem;
-  font-weight: 800;
-  color: #fb7185;
-  background: rgba(244, 63, 94, 0.12);
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-top: 0.2rem;
-  margin-left: 1.8rem;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 900;
+  color: #ffffff;
+  background: #b91c1c;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  margin-top: 0.35rem;
+  box-shadow: 0 2px 6px rgba(185, 28, 28, 0.4);
 }
 
 .btn-bump-ticket {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.4rem;
+  gap: 0.5rem;
   width: 100%;
+  min-height: 56px;
   background: var(--accent-emerald);
   color: #ffffff;
-  font-size: 0.88rem;
+  font-size: 1.05rem;
   font-weight: 800;
-  padding: 0.6rem 0;
+  padding: 0.75rem 0;
   border: none;
   cursor: pointer;
   transition: all 0.15s ease;
+  user-select: none;
 }
 
 .btn-bump-ticket:hover {
-  filter: brightness(1.1);
+  background: var(--accent-emerald-hover);
+}
+
+.btn-bump-ticket:active {
+  transform: scale(0.98);
 }
 
 .kds-empty-state {
@@ -1716,3 +1933,189 @@ html, body {
 .flex { display: flex; }
 .items-center { align-items: center; }
 .gap-1 { gap: 0.25rem; }
+
+/* Data Table Precision: Sticky Header & Zebra Striping */
+.data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #090e17;
+  border-bottom: 2px solid var(--border-strong);
+}
+
+.data-table tbody tr:nth-child(even) td {
+  background-color: rgba(255, 255, 255, 0.022);
+}
+
+.data-table tbody tr:hover td {
+  background-color: rgba(56, 189, 248, 0.08);
+}
+
+/* Loading & Async State Indicators */
+.spin-loader {
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+}
+
+.btn-loading {
+  opacity: 0.7;
+  pointer-events: none;
+  cursor: wait !important;
+}
+
+/* ==========================================================================
+   5. COMPREHENSIVE RESPONSIVE DESIGN & ADAPTIVE BREAKPOINTS
+   ========================================================================== */
+
+/* 1. Large Laptops & Touch POS Terminals (1366px Elo / Toast Flex) */
+@media (max-width: 1366px) {
+  .navbar {
+    padding: 0 0.5rem;
+    gap: 0.4rem;
+  }
+  .nav-tab {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.78rem;
+  }
+  .brand-title {
+    font-size: 0.88rem;
+  }
+  .brand-subtitle {
+    font-size: 0.6rem;
+  }
+  .cart-sidebar-docked {
+    width: 330px;
+    min-width: 300px;
+  }
+}
+
+/* 2. Tablets & Medium Screens (1024px Landscape / iPad Pro) */
+@media (max-width: 1024px) {
+  .menu-grid-scroll {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.4rem;
+  }
+  .pos-card {
+    min-height: 175px;
+  }
+  .pos-card-img-wrapper {
+    height: 85px;
+  }
+  .cart-sidebar-docked {
+    width: 300px;
+  }
+  .btn-cash-quick {
+    min-height: 42px;
+    font-size: 0.88rem;
+  }
+  .btn-checkout {
+    min-height: 52px;
+    font-size: 0.95rem;
+  }
+  .kpi-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+}
+
+/* 3. Handheld POS & Mobile Viewports (768px Portrait / Line Busters) */
+@media (max-width: 768px) {
+  html, body, #app, .app-shell {
+    overflow-y: auto;
+    height: auto;
+    min-height: 100vh;
+  }
+  .navbar {
+    height: auto;
+    min-height: 48px;
+    flex-wrap: wrap;
+    padding: 0.5rem;
+  }
+  .module-nav {
+    overflow-x: auto;
+    width: 100%;
+    order: 3;
+    padding-bottom: 4px;
+  }
+  .pos-workspace-split {
+    flex-direction: column;
+    height: auto;
+    overflow: visible;
+  }
+  .pos-menu-column {
+    height: auto;
+    overflow: visible;
+    padding: 0.5rem;
+  }
+  .menu-grid-scroll {
+    overflow: visible;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+  .cart-sidebar-docked {
+    width: 100%;
+    max-width: 100%;
+    border-left: none;
+    border-top: 2px solid var(--border-strong);
+    height: auto;
+    overflow: visible;
+  }
+  .cart-items-scroll {
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  .cart-footer-pinned {
+    position: sticky;
+    bottom: 0;
+    z-index: 50;
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+  .tables-grid, .kds-grid {
+    grid-template-columns: 1fr;
+  }
+  .workspace-container {
+    padding: 0.75rem;
+  }
+}
+
+/* 4. Small Smartphone Screens (480px / Clover Flex / Pax A920) */
+@media (max-width: 480px) {
+  .brand-subtitle {
+    display: none;
+  }
+  .navbar-right .btn-utility span {
+    display: none;
+  }
+  .quick-cash-buttons {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .checkout-actions-grid {
+    grid-template-columns: 1fr;
+  }
+  .pos-card-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+  .tile-actions {
+    width: 100%;
+  }
+  .btn-add-quick {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+/* Modern Notch & Home Indicator Safe Areas */
+@supports (padding: max(0px)) {
+  .app-shell {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+  .navbar {
+    padding-top: max(0px, env(safe-area-inset-top));
+  }
+}

@@ -46,7 +46,7 @@ export const AppContent: React.FC = () => {
       <Navbar />
 
       {/* Main Viewport */}
-      <main className="main-viewport">
+      <main id="main-workspace" className="main-viewport">
         {renderActiveWorkspace()}
       </main>
 

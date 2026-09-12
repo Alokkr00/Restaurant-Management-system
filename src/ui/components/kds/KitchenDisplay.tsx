@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { Clock, CheckCircle, AlertOctagon, Flame } from 'lucide-react';
 
 export const KitchenDisplay: React.FC = () => {
   const { kdsTickets, activeKdsStation, setActiveKdsStation, bumpKDSTicket } = useStore();
+  const [bumpingId, setBumpingId] = useState<string | null>(null);
 
   const stations = ['ALL', 'HOTLINE_1', 'EXPO'];
 
@@ -11,10 +12,52 @@ export const KitchenDisplay: React.FC = () => {
     ? kdsTickets
     : kdsTickets.filter((t) => t.station === activeKdsStation);
 
+  // Hardware Bump Bar Integration (Keys 1-9 & Spacebar)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input or textarea
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
+        return;
+      }
+
+      if (e.code === 'Space' && filteredTickets.length > 0) {
+        e.preventDefault();
+        handleBump(filteredTickets[0].id);
+      } else {
+        const num = parseInt(e.key, 10);
+        if (!isNaN(num) && num >= 1 && num <= 9) {
+          const target = filteredTickets[num - 1];
+          if (target) {
+            e.preventDefault();
+            handleBump(target.id);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [filteredTickets]);
+
+  const handleBump = async (ticketId: string) => {
+    setBumpingId(ticketId);
+    try {
+      await bumpKDSTicket(ticketId);
+    } finally {
+      setBumpingId(null);
+    }
+  };
+
   const getTimerClass = (minutes: number, status: string) => {
     if (status === 'LATE' || minutes >= 10) return 'timer-late';
     if (minutes >= 5) return 'timer-warning';
     return 'timer-normal';
+  };
+
+  const getHeaderClass = (minutes: number, status: string) => {
+    if (status === 'LATE' || minutes >= 10) return 'header-late';
+    if (minutes >= 5) return 'header-warning';
+    return 'header-normal';
   };
 
   return (
@@ -49,20 +92,22 @@ export const KitchenDisplay: React.FC = () => {
             <p>New orders placed on the POS or delivery channels will appear here automatically.</p>
           </div>
         ) : (
-          filteredTickets.map((ticket) => {
+          filteredTickets.map((ticket, index) => {
             const timerClass = getTimerClass(ticket.elapsedMinutes, ticket.status);
+            const headerClass = getHeaderClass(ticket.elapsedMinutes, ticket.status);
             const isLate = ticket.status === 'LATE' || ticket.elapsedMinutes >= 10;
+            const isBumping = bumpingId === ticket.id;
 
             return (
               <div key={ticket.id} className={`kds-card ${isLate ? 'kds-card-late' : ''}`}>
-                {/* Header */}
-                <div className="kds-card-header">
+                {/* Header with Solid Urgency Flood */}
+                <div className={`kds-card-header ${headerClass}`}>
                   <div>
-                    <div className="kds-ticket-id">{ticket.id}</div>
+                    <div className="kds-ticket-id">#{index + 1} &bull; {ticket.id}</div>
                     <div className="kds-source-tag">{ticket.source}</div>
                   </div>
                   <div className={`kds-timer-badge ${timerClass}`}>
-                    <Clock size={13} />
+                    <Clock size={14} />
                     <span>
                       {ticket.elapsedMinutes}:{ticket.elapsedSeconds < 10 ? `0${ticket.elapsedSeconds}` : ticket.elapsedSeconds}
                     </span>
@@ -94,24 +139,32 @@ export const KitchenDisplay: React.FC = () => {
                         </div>
                       )}
 
-                      {/* Allergens */}
+                      {/* Prominent High-Contrast Allergen Warning */}
                       {item.allergens && item.allergens.length > 0 && (
                         <div className="kds-allergens-box">
-                          <AlertOctagon size={12} />
-                          <span>ALLERGENS: {item.allergens.join(', ')}</span>
+                          <AlertOctagon size={14} />
+                          <span>⚠️ ALLERGEN ALERT: {item.allergens.join(', ')}</span>
                         </div>
                       )}
                     </div>
                   ))}
                 </div>
 
-                {/* Full-width Bump Button */}
+                {/* Full-width Bump Button with Tactile Slot Key Hint */}
                 <button
-                  className="btn-bump-ticket"
-                  onClick={() => bumpKDSTicket(ticket.id)}
+                  className={`btn-bump-ticket ${isBumping ? 'btn-loading' : ''}`}
+                  disabled={isBumping}
+                  onClick={() => handleBump(ticket.id)}
+                  title={`Press [${index + 1}] or Spacebar to bump`}
                 >
-                  <Flame size={15} />
-                  <span>Bump & Complete</span>
+                  {isBumping ? (
+                    <span className="spin-loader" />
+                  ) : (
+                    <>
+                      <Flame size={16} />
+                      <span>[{index + 1}] Bump & Complete</span>
+                    </>
+                  )}
                 </button>
               </div>
             );

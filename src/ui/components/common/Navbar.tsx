@@ -86,9 +86,14 @@ export const Navbar: React.FC = () => {
 
   return (
     <header className="navbar">
+      {/* Accessible Skip Link */}
+      <a href="#main-workspace" className="skip-link">
+        Skip to main content
+      </a>
+
       {/* Brand Section */}
       <div className="brand-section">
-        <img src="/brand_logo.jpg" alt="Logo" className="logo-img" />
+        <img src="/restaurant_logo.jpg" alt="Restaurant Logo" className="logo-img" />
         <div>
           <div className="brand-title">RMS Store Console</div>
           <div className="brand-subtitle">STORE #104 CHICAGO WEST &bull; EDGE WAL</div>
