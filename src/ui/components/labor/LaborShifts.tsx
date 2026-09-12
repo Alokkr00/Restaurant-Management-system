@@ -64,7 +64,7 @@ export const LaborShifts: React.FC = () => {
                           <span>{emp.shiftStart || '09:00 AM'}</span>
                         </span>
                       ) : (
-                        '&mdash;'
+                        '—'
                       )}
                     </td>
                     <td className="font-mono">${Number(emp.hourlyRateUSD ?? 16.50).toFixed(2)}</td>

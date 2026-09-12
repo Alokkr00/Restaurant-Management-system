@@ -105,8 +105,8 @@ export const FinancialsView: React.FC = () => {
                   <td className="font-mono font-bold">{je.id}</td>
                   <td className="text-muted">{je.date}</td>
                   <td className="font-bold">{je.account}</td>
-                  <td className="font-mono">{je.debit > 0 ? `$${je.debit.toFixed(2)}` : '&mdash;'}</td>
-                  <td className="font-mono">{je.credit > 0 ? `$${je.credit.toFixed(2)}` : '&mdash;'}</td>
+                  <td className="font-mono">{je.debit > 0 ? `$${je.debit.toFixed(2)}` : '—'}</td>
+                  <td className="font-mono">{je.credit > 0 ? `$${je.credit.toFixed(2)}` : '—'}</td>
                   <td className="text-muted">{je.memo}</td>
                 </tr>
               ))}
