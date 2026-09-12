@@ -2,6 +2,7 @@ import express from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import cors from 'cors';
+import fs from 'fs';
 import path from 'path';
 import { POSTransaction, MenuItem } from '../shared/types.js';
 import { ESCPOSThermalPrinterDriver, PrinterStationConfig } from '../hardware/escpos-printer.js';
@@ -20,6 +21,7 @@ import { SupportBundleCollector } from '../shared/support-bundle.js';
 import { HardwareRegistry } from '../hardware/hardware-registry.js';
 import { MenuStructureEngine } from '../pos/menu-structure-engine.js';
 import { DatabaseAdapter } from './db/database-adapter.js';
+import { pathResolver, resolveDataPath, resolveExportPath, resolveBundlePath, resolveLogPath } from '../shared/path-resolver.js';
 
 const app = express();
 app.use(cors());
@@ -1297,6 +1299,68 @@ app.get('/api/financials/ledger', (req, res) => {
       primeCostPct: 52.9,
     },
   });
+});
+
+// ─── Dynamic Platform-Agnostic Directory Resolution (PADR) Endpoints ──
+app.get('/api/v1/support/bundle', (req, res) => {
+  try {
+    const bundle = supportBundleCollector.generateDiagnosticsBundle(STORE_NODE_ID, isTrainingModeActive);
+    const bundleFilePath = resolveBundlePath(`${bundle.bundleId}.json`);
+    fs.writeFileSync(bundleFilePath, JSON.stringify(bundle, null, 2), 'utf8');
+    res.json({
+      success: true,
+      bundle,
+      filePath: bundleFilePath,
+      directory: path.dirname(bundleFilePath),
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/v1/diagnostics/padr', (req, res) => {
+  res.json({
+    success: true,
+    diagnostics: pathResolver.getPlatformDiagnostics(),
+    activeDatabasePath: (db as any).getDataFilePath ? (db as any).getDataFilePath() : resolveDataPath('store-edge.db.json'),
+  });
+});
+
+app.post('/api/financials/export-netsuite', (req, res) => {
+  try {
+    const date = new Date().toISOString().split('T')[0];
+    const filename = `netsuite-gl-${STORE_NODE_ID}-${date}.csv`;
+    const exportPath = resolveExportPath('netsuite', filename);
+    const csvContent = [
+      'Account,AccountName,Debit,Credit,Memo',
+      '4010,Food Sales Revenue,0,5497.00,Daily POS sales settlement',
+      '2020,Statutory GST Output Liability,0,274.85,5% GST liability',
+      '1010,Cash Drawer Float,2150.00,0,Net settled cash',
+      '1020,Card Merchant Clearing,3621.85,0,Card settlement',
+      '5010,Cost of Goods Sold (COGS),1580.00,0,BOM ingredient depletion',
+      '1310,Walk-In Raw Inventory Asset,0,1580.00,COGS perpetual asset reduction',
+    ].join('\n');
+    fs.writeFileSync(exportPath, csvContent, 'utf8');
+    res.json({ success: true, exportPath, filename });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/labor/export-adp', (req, res) => {
+  try {
+    const date = new Date().toISOString().split('T')[0];
+    const filename = `adp-payroll-${STORE_NODE_ID}-${date}.csv`;
+    const exportPath = resolveExportPath('adp', filename);
+    const csvContent = [
+      'AssociateID,EmployeeName,PayPeriodDate,Jurisdiction,RegularHours,OvertimeHours,DoubleTimeHours,BlendedRate,AllocatedTips,BreakAttestation,GrossPay',
+      ...employees.map(e => `"${e.id}","${e.name}","${date}","FEDERAL",${e.hours},0,0,15.00,0,"COMPLIANT",${(e.hours * 15.00).toFixed(2)}`),
+    ].join('\n');
+    fs.writeFileSync(exportPath, csvContent, 'utf8');
+    res.json({ success: true, exportPath, filename });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 const PORT = process.env.PORT || 3001;

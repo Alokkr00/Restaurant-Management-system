@@ -1,5 +1,7 @@
+import fs from 'fs';
 import { Shift, BreakAttestation } from '../labor/compliance-guardrails.js';
 import { TipDistribution } from '../fintech/tip-pooling-engine.js';
+import { resolveExportPath } from '../shared/path-resolver.js';
 
 export type StateOvertimeJurisdiction = 'FEDERAL' | 'CALIFORNIA' | 'COLORADO' | 'NEVADA';
 
@@ -142,5 +144,19 @@ export class ADPPayrollIntegration {
     });
 
     return records;
+  }
+
+  /**
+   * Serializes payroll records to compliant ADP CSV format and saves into PADR exports directory
+   */
+  public exportPayrollToCSV(records: ADPPayrollRecord[], payPeriodDate: string, customFilename?: string): string {
+    const filename = customFilename || `adp-payroll-${payPeriodDate.replace(/[^a-zA-Z0-9]/g, '-')}-${Date.now()}.csv`;
+    const filePath = resolveExportPath('adp', filename);
+    const rows = ['AssociateID,EmployeeName,PayPeriodDate,Jurisdiction,RegularHours,OvertimeHours,DoubleTimeHours,BlendedRate,AllocatedTips,BreakAttestation,GrossPay'];
+    for (const r of records) {
+      rows.push(`"${r.associateID}","${r.employeeName}","${r.payPeriodDate}","${r.jurisdiction}",${r.regularHours},${r.overtimeHours15x},${r.doubleTimeHours20x},${r.blendedRegularRateUSD},${r.allocatedTipsUSD},"${r.breakAttestationStatus}",${r.grossPayUSD}`);
+    }
+    fs.writeFileSync(filePath, rows.join('\n'), 'utf8');
+    return filePath;
   }
 }

@@ -31,4 +31,10 @@ dist-server/
 # Scratch
 scratch/
 
-
+# Platform-Agnostic Directory Resolution (PADR) Runtime Stores
+data/
+logs/
+exports/
+backups/
+bundles/
+temp/

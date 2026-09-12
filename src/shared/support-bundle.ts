@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { pathResolver, PlatformDiagnostics } from './path-resolver.js';
 
 export interface DiagnosticsSupportBundle {
   bundleId: string;
@@ -27,6 +28,7 @@ export interface DiagnosticsSupportBundle {
     triggerCondition: string;
     recoverySteps: string[];
   }[];
+  platformDiagnostics?: PlatformDiagnostics;
 }
 
 export class SupportBundleCollector {
@@ -191,6 +193,7 @@ export class SupportBundleCollector {
       printQueueStats,
       databaseTableCounts: tableCounts,
       guidedRecoveryRunbooks: runbooks,
+      platformDiagnostics: pathResolver.getPlatformDiagnostics(),
     };
   }
 }

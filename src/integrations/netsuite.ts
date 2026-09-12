@@ -1,5 +1,7 @@
+import fs from 'fs';
 import { POSTransaction } from '../shared/types.js';
 import { FranchiseeRoyaltyInvoice } from '../fintech/royalty-engine.js';
+import { resolveExportPath } from '../shared/path-resolver.js';
 
 export interface NetSuiteGLLine {
   accountNumber: string;
@@ -215,5 +217,19 @@ export class NetSuiteERPIntegration {
       totalCredits,
       lines,
     };
+  }
+
+  /**
+   * Serializes journal entry to standard CSV and saves into the PADR exports directory
+   */
+  public exportJournalToCSV(journal: NetSuiteJournalEntry, customFilename?: string): string {
+    const filename = customFilename || `netsuite-gl-${journal.entryDate}-${Date.now()}.csv`;
+    const filePath = resolveExportPath('netsuite', filename);
+    const rows = ['Account,AccountName,Debit,Credit,EntityId,Memo'];
+    for (const line of journal.lines) {
+      rows.push(`"${line.accountNumber}","${line.accountName}",${line.debit},${line.credit},"${line.entityId || ''}","${line.memo || ''}"`);
+    }
+    fs.writeFileSync(filePath, rows.join('\n'), 'utf8');
+    return filePath;
   }
 }

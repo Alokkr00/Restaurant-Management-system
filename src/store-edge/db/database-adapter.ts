@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { resolveDataPath, migrateRootDatabaseIfExists } from '../../shared/path-resolver.js';
 
 /**
  * Universal Fault-Tolerant SQLite Adapter
@@ -11,8 +12,21 @@ export class DatabaseAdapter {
   private tables: Map<string, any[]> = new Map();
 
   constructor(filename: string = 'store-edge.db') {
-    this.dataFilePath = filename === ':memory:' ? '' : path.resolve(process.cwd(), filename.endsWith('.json') ? filename : `${filename}.json`);
+    if (filename === ':memory:') {
+      this.dataFilePath = '';
+    } else {
+      const normalizedName = filename.endsWith('.json') ? filename : `${filename}.json`;
+      // Automatically migrate legacy root database if present
+      migrateRootDatabaseIfExists(normalizedName, normalizedName);
+      this.dataFilePath = path.isAbsolute(normalizedName)
+        ? normalizedName
+        : resolveDataPath(normalizedName);
+    }
     this.loadFromDisk();
+  }
+
+  public getDataFilePath(): string {
+    return this.dataFilePath;
   }
 
   pragma(pragmaStatement: string): void {
