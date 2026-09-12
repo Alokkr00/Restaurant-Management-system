@@ -1193,8 +1193,8 @@ app.post('/api/cash/payout', (req, res) => {
 
 // ─── Fully Dynamic Inventory Waste & Batch Prep Endpoints ───────────────
 let spoilageLogs = [
-  { id: 'spoil-1', item: 'Dough Ball 500g', qty: '5 pcs', reason: 'DROPPED_FLOOR', cost: '$7.50', loggedBy: 'Kitchen Lead', timestamp: '2026-08-14 11:20' },
-  { id: 'spoil-2', item: 'Buffalo Wings (Raw)', qty: '1.2 kg', reason: 'EXPIRED', cost: '$14.20', loggedBy: 'GM Audit', timestamp: '2026-08-13 18:45' },
+  { id: 'spoil-1', item: 'Dough Ball 500g', qty: '5 pcs', reason: 'DROPPED_FLOOR', cost: '$7.50', costUSD: 7.50, loggedBy: 'Kitchen Lead', timestamp: '2026-08-14 11:20', date: '2026-08-14' },
+  { id: 'spoil-2', item: 'Buffalo Wings (Raw)', qty: '1.2 kg', reason: 'EXPIRED', cost: '$14.20', costUSD: 14.20, loggedBy: 'GM Audit', timestamp: '2026-08-13 18:45', date: '2026-08-13' },
 ];
 
 app.get('/api/inventory/waste', (req, res) => {
@@ -1203,14 +1203,17 @@ app.get('/api/inventory/waste', (req, res) => {
 
 app.post('/api/inventory/waste', (req, res) => {
   const { item, qty, reason, cost, loggedBy } = req.body;
+  const parsedCost = typeof cost === 'number' ? cost : parseFloat(String(cost || '').replace(/[^0-9.]/g, '')) || 8.50;
   const newLog = {
     id: `spoil-${Date.now()}`,
     item: item || 'Mozzarella Cheese (Shredded)',
     qty: qty || '1.0 kg',
     reason: reason || 'BURNT / OVERCOOKED',
-    cost: cost || '$8.50',
+    cost: `$${parsedCost.toFixed(2)}`,
+    costUSD: parsedCost,
     loggedBy: loggedBy || 'Kitchen Lead',
     timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
+    date: new Date().toISOString().split('T')[0],
   };
   spoilageLogs.unshift(newLog);
 
@@ -1221,19 +1224,53 @@ app.get('/api/inventory/recipes', (req, res) => {
   res.json({
     success: true,
     recipes: [
-      { productId: 'item-101', name: 'Large Pepperoni Pizza', yieldPortions: 1, cogsEstimatedINR: 280, ingredients: [{ name: 'High-Gluten Flour Batch', qty: 0.35, unit: 'kg' }, { name: 'Mozzarella Cheese (Shredded)', qty: 0.25, unit: 'kg' }, { name: 'Pepperoni Slices', qty: 0.12, unit: 'kg' }] },
-      { productId: 'item-104', name: 'Spicy Buffalo Wings', yieldPortions: 1, cogsEstimatedINR: 190, ingredients: [{ name: 'Raw Chicken Wings', qty: 0.5, unit: 'kg' }, { name: 'Buffalo Hot Sauce', qty: 0.08, unit: 'L' }] },
-      { productId: 'item-105', name: 'Artisanal Garlic Knots', yieldPortions: 6, cogsEstimatedINR: 75, ingredients: [{ name: 'High-Gluten Flour Batch', qty: 0.2, unit: 'kg' }, { name: 'Garlic Herb Butter', qty: 0.05, unit: 'kg' }] },
+      {
+        id: 'rcp-101',
+        productId: 'item-101',
+        name: 'Large Pepperoni Pizza',
+        yieldPortions: 1,
+        targetYield: 1,
+        cogsEstimatedINR: 280,
+        ingredients: [
+          { name: 'High-Gluten Flour Batch', qty: 0.35, unit: 'kg', cost: 1.25 },
+          { name: 'Mozzarella Cheese (Shredded)', qty: 0.25, unit: 'kg', cost: 2.10 },
+          { name: 'Pepperoni Slices', qty: 0.12, unit: 'kg', cost: 1.80 }
+        ]
+      },
+      {
+        id: 'rcp-104',
+        productId: 'item-104',
+        name: 'Spicy Buffalo Wings',
+        yieldPortions: 1,
+        targetYield: 1,
+        cogsEstimatedINR: 190,
+        ingredients: [
+          { name: 'Raw Chicken Wings', qty: 0.5, unit: 'kg', cost: 3.40 },
+          { name: 'Buffalo Hot Sauce', qty: 0.08, unit: 'L', cost: 0.85 }
+        ]
+      },
+      {
+        id: 'rcp-105',
+        productId: 'item-105',
+        name: 'Artisanal Garlic Knots',
+        yieldPortions: 6,
+        targetYield: 6,
+        cogsEstimatedINR: 75,
+        ingredients: [
+          { name: 'High-Gluten Flour Batch', qty: 0.2, unit: 'kg', cost: 0.70 },
+          { name: 'Garlic Herb Butter', qty: 0.05, unit: 'kg', cost: 0.95 }
+        ]
+      },
     ],
   });
 });
 
 // ─── Fully Dynamic Labor Scheduling, Clocking & Tip Pooling ─────────────
 let employees = [
-  { id: 'emp-101', name: 'John Doe', role: 'Kitchen Prep', status: 'CLOCKED_IN', shiftStart: '08:00 AM', hours: 6.5, breakAttested: true },
-  { id: 'emp-102', name: 'Sarah Jenkins', role: 'Cashier', status: 'CLOCKED_IN', shiftStart: '10:00 AM', hours: 4.5, breakAttested: true },
-  { id: 'emp-103', name: 'Michael Smith', role: 'Shift Lead', status: 'CLOCKED_OUT', shiftStart: 'Yesterday', hours: 8.0, breakAttested: true },
-  { id: 'emp-104', name: 'David Miller', role: 'Line Cook', status: 'CLOCKED_IN', shiftStart: '11:00 AM', hours: 3.5, breakAttested: true },
+  { id: 'emp-101', name: 'John Doe', role: 'Kitchen Prep', status: 'CLOCKED_IN', shiftStart: '08:00 AM', hours: 6.5, hoursThisWeek: 32.5, hourlyRateUSD: 16.50, breakAttested: true },
+  { id: 'emp-102', name: 'Sarah Jenkins', role: 'Cashier', status: 'CLOCKED_IN', shiftStart: '10:00 AM', hours: 4.5, hoursThisWeek: 28.0, hourlyRateUSD: 15.00, breakAttested: true },
+  { id: 'emp-103', name: 'Michael Smith', role: 'Shift Lead', status: 'CLOCKED_OUT', shiftStart: 'Yesterday', hours: 8.0, hoursThisWeek: 40.0, hourlyRateUSD: 22.00, breakAttested: true },
+  { id: 'emp-104', name: 'David Miller', role: 'Line Cook', status: 'CLOCKED_IN', shiftStart: '11:00 AM', hours: 3.5, hoursThisWeek: 26.5, hourlyRateUSD: 17.50, breakAttested: true },
 ];
 
 let tipPoolTotalPaise = 45000; // $450.00 in pool

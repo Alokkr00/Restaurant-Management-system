@@ -30,7 +30,7 @@ export const FinancialsView: React.FC = () => {
             <span className="kpi-label">Gross Sales Today</span>
             <TrendingUp size={16} className="text-emerald" />
           </div>
-          <div className="kpi-val text-emerald">${kpis.grossSalesUSD.toFixed(2)}</div>
+          <div className="kpi-val text-emerald">${Number(kpis?.grossSalesUSD ?? 0).toFixed(2)}</div>
           <div className="kpi-meta">All Dining & Aggregator Channels</div>
         </div>
 
@@ -39,7 +39,7 @@ export const FinancialsView: React.FC = () => {
             <span className="kpi-label">Net Sales</span>
             <Calculator size={16} className="text-muted" />
           </div>
-          <div className="kpi-val">${kpis.netSalesUSD.toFixed(2)}</div>
+          <div className="kpi-val">${Number(kpis?.netSalesUSD ?? 0).toFixed(2)}</div>
           <div className="kpi-meta">Excluding Sales Tax</div>
         </div>
 
@@ -48,7 +48,7 @@ export const FinancialsView: React.FC = () => {
             <span className="kpi-label">Tax Collected</span>
             <Landmark size={16} className="text-muted" />
           </div>
-          <div className="kpi-val">${kpis.taxCollectedUSD.toFixed(2)}</div>
+          <div className="kpi-val">${Number(kpis?.taxCollectedUSD ?? 0).toFixed(2)}</div>
           <div className="kpi-meta">Jurisdiction Sales Tax (8%)</div>
         </div>
 
@@ -57,7 +57,7 @@ export const FinancialsView: React.FC = () => {
             <span className="kpi-label">Food Cost %</span>
             <span className="badge badge-online">PAR</span>
           </div>
-          <div className="kpi-val text-emerald">{kpis.foodCostPct.toFixed(1)}%</div>
+          <div className="kpi-val text-emerald">{Number(kpis?.foodCostPct ?? 0).toFixed(1)}%</div>
           <div className="kpi-meta">Industry Benchmark: 28-32%</div>
         </div>
 
@@ -66,7 +66,7 @@ export const FinancialsView: React.FC = () => {
             <span className="kpi-label">Labor Cost %</span>
             <span className="badge badge-online">OPTIMAL</span>
           </div>
-          <div className="kpi-val text-emerald">{kpis.laborCostPct.toFixed(1)}%</div>
+          <div className="kpi-val text-emerald">{Number(kpis?.laborCostPct ?? 0).toFixed(1)}%</div>
           <div className="kpi-meta">Target: &lt; 25%</div>
         </div>
 
@@ -75,7 +75,7 @@ export const FinancialsView: React.FC = () => {
             <span className="kpi-label">Prime Cost (COGS + Labor)</span>
             <span className="badge badge-online">EXCELLENT</span>
           </div>
-          <div className="kpi-val highlight-val">{kpis.primeCostPct.toFixed(1)}%</div>
+          <div className="kpi-val highlight-val">{Number(kpis?.primeCostPct ?? 0).toFixed(1)}%</div>
           <div className="kpi-meta">Target: &lt; 55% Total Revenue</div>
         </div>
       </div>

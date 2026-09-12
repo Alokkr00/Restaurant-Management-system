@@ -67,7 +67,7 @@ export const InventoryView: React.FC = () => {
                 <tr key={stk.ingredientId}>
                   <td className="font-mono font-bold">{stk.ingredientId}</td>
                   <td>{stk.name}</td>
-                  <td className="font-mono font-bold text-lg">{stk.balance.toFixed(1)}</td>
+                  <td className="font-mono font-bold text-lg">{Number(stk.balance ?? 0).toFixed(1)}</td>
                   <td>{stk.unit}</td>
                   <td>
                     <span className="badge badge-online">Within Par (&plusmn;1.2%)</span>
@@ -91,13 +91,15 @@ export const InventoryView: React.FC = () => {
             <div key={rcp.id} className="recipe-card">
               <div className="recipe-card-header">
                 <h4 className="recipe-name">{rcp.name}</h4>
-                <span className="recipe-yield">Yield: {rcp.targetYield} Serving</span>
+                <span className="recipe-yield">Yield: {rcp.targetYield ?? 1} Serving</span>
               </div>
               <div className="recipe-ingredients-list">
                 {rcp.ingredients.map((ing, ii) => (
                   <div key={ii} className="recipe-ing-row">
                     <span>{ing.name}</span>
-                    <span className="font-mono font-bold">{ing.qty} {ing.unit} (${ing.cost.toFixed(2)})</span>
+                    <span className="font-mono font-bold">
+                      {ing.qty} {ing.unit} (${Number(ing.cost ?? 1.50).toFixed(2)})
+                    </span>
                   </div>
                 ))}
               </div>
@@ -129,7 +131,7 @@ export const InventoryView: React.FC = () => {
               {spoilageLogs.map((log) => (
                 <tr key={log.id}>
                   <td className="font-mono">{log.id}</td>
-                  <td className="text-muted">{log.date}</td>
+                  <td className="text-muted">{log.date || 'Today'}</td>
                   <td>{log.item}</td>
                   <td className="font-mono">{log.qty}</td>
                   <td>
@@ -138,7 +140,9 @@ export const InventoryView: React.FC = () => {
                       <span>{log.reason}</span>
                     </span>
                   </td>
-                  <td className="font-mono font-bold text-rose">-${log.costUSD.toFixed(2)}</td>
+                  <td className="font-mono font-bold text-rose">
+                    -${Number(log.costUSD ?? 0).toFixed(2)}
+                  </td>
                 </tr>
               ))}
             </tbody>

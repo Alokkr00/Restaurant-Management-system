@@ -11,6 +11,7 @@ import { InventoryView } from './components/inventory/InventoryView';
 import { LaborShifts } from './components/labor/LaborShifts';
 import { MenuCatalog } from './components/menu/MenuCatalog';
 import { FinancialsView } from './components/financials/FinancialsView';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 export const AppContent: React.FC = () => {
   const { activeModule } = useStore();
@@ -47,7 +48,9 @@ export const AppContent: React.FC = () => {
 
       {/* Main Viewport */}
       <main id="main-workspace" className="main-viewport">
-        {renderActiveWorkspace()}
+        <ErrorBoundary key={activeModule}>
+          {renderActiveWorkspace()}
+        </ErrorBoundary>
       </main>
 
       {/* Non-blocking Toasts */}

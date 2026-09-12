@@ -67,8 +67,8 @@ export const LaborShifts: React.FC = () => {
                         '&mdash;'
                       )}
                     </td>
-                    <td className="font-mono">${emp.hourlyRateUSD.toFixed(2)}</td>
-                    <td className="font-mono font-bold">{emp.hoursThisWeek}h</td>
+                    <td className="font-mono">${Number(emp.hourlyRateUSD ?? 16.50).toFixed(2)}</td>
+                    <td className="font-mono font-bold">{emp.hoursThisWeek ?? (emp as any).hours ?? 30}h</td>
                     <td>
                       <button
                         className={`btn-table-action ${isClockedIn ? 'btn-clock-out' : 'btn-clock-in'}`}
