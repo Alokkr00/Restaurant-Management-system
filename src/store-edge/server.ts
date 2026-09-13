@@ -22,6 +22,11 @@ import { HardwareRegistry } from '../hardware/hardware-registry.js';
 import { MenuStructureEngine } from '../pos/menu-structure-engine.js';
 import { DatabaseAdapter } from './db/database-adapter.js';
 import { pathResolver, resolveDataPath, resolveExportPath, resolveBundlePath, resolveLogPath } from '../shared/path-resolver.js';
+import { StoreMDMService } from '../mdm/store-mdm.js';
+import { StaffMDMService } from '../mdm/staff-mdm.js';
+import { MenuMDMService } from '../mdm/menu-mdm.js';
+import { CQRSOrderEngine } from '../cqrs/projection-engine.js';
+import { CreateOrderCommand } from '../cqrs/commands/order-commands.js';
 
 const app = express();
 app.use(cors());
@@ -53,6 +58,10 @@ const reconciliationEngine = new DayEndReconciliationEngine(db);
 const supportBundleCollector = new SupportBundleCollector(db);
 const hardwareRegistry = new HardwareRegistry();
 const menuStructureEngine = new MenuStructureEngine();
+const storeMDM = new StoreMDMService(db);
+const staffMDM = new StaffMDMService(db);
+const menuMDM = new MenuMDMService(db);
+const cqrsEngine = new CQRSOrderEngine(db, recipeEngine, menuMDM, STORE_NODE_ID);
 
 const printQueueWorker = new DurablePrintQueueWorker(db, [
   { printerId: 'printer-hotline-primary', name: 'Kitchen Hotline Thermal', host: '192.168.1.150', port: 9100, timeoutMs: 1500, fallbackPrinterId: 'printer-expo-backup' },
@@ -1033,6 +1042,32 @@ app.post('/api/pos/checkout', async (req, res) => {
       });
     }
 
+    // CQRS Command Pipeline: Line item validation -> Append-only SQLite WAL -> Async Vector Queue
+    let cqrsAck;
+    try {
+      const command: CreateOrderCommand = {
+        orderId: tx.id,
+        storeId: STORE_NODE_ID,
+        terminalId: tx.terminalId || 'pos-1',
+        orderType: 'DINE_IN',
+        items: (tx.items || []).map((i) => ({
+          menuItemId: i.menuItemId,
+          name: i.menuItemId === 'item-101' ? 'Large Pepperoni Pizza' : (i.menuItemId === 'item-104' ? 'Spicy Buffalo Wings' : (i.menuItemId === 'item-105' ? 'Artisanal Garlic Knots' : 'Menu Item')),
+          quantity: i.quantity,
+          unitPriceCents: Math.round(i.unitPrice * 100),
+        })),
+        subtotalCents: Math.round(tx.subtotal * 100),
+        taxCents: Math.round(tx.tax * 100),
+        totalCents: Math.round(tx.total * 100),
+        tenders: (tx.tenders || []).map((t) => ({ type: (t.type as any) || 'CARD', amountCents: Math.round(t.amount * 100) })),
+        offlineMode: tx.offlineMode || false,
+        timestamp: tx.timestamp || new Date().toISOString(),
+      };
+      cqrsAck = await cqrsEngine.executeCreateOrder(command);
+    } catch (cqrsErr: any) {
+      console.warn('[CQRS] Order command notice:', cqrsErr.message);
+    }
+
     // Broadcast ticket over LAN WebSocket (< 200ms)
     wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
@@ -1047,6 +1082,7 @@ app.post('/api/pos/checkout', async (req, res) => {
       sqliteWalPersisted: true,
       printerResult: printResult,
       mode: tx.offlineMode ? 'OFFLINE_DEFERRED_AUTH' : 'ONLINE_AUTH',
+      cqrs: cqrsAck ? { eventId: cqrsAck.eventId, vectorClock: cqrsAck.vectorClock, status: cqrsAck.status } : undefined,
     });
   } catch (err: any) {
     if (err.message && err.message.includes('UNIQUE constraint failed')) {
@@ -1145,11 +1181,18 @@ let activeKDSTickets = [
 ];
 
 app.get('/api/kds/tickets', (req, res) => {
+  const station = req.query.station as string | undefined;
+  const projectionTickets = cqrsEngine.getKDSTickets(STORE_NODE_ID, station);
+  if (projectionTickets.length > 0) {
+    return res.json({ success: true, tickets: projectionTickets });
+  }
   res.json({ success: true, tickets: activeKDSTickets });
 });
 
 app.post('/api/kds/tickets/:id/bump', (req, res) => {
   const { id } = req.params;
+  const bumped = cqrsEngine.bumpKDSTicket(id);
+
   const index = activeKDSTickets.findIndex(t => t.id === id);
   if (index >= 0) {
     const t = activeKDSTickets[index];
@@ -1161,13 +1204,140 @@ app.post('/api/kds/tickets/:id/bump', (req, res) => {
     }
   }
 
+  const allActive = cqrsEngine.getKDSTickets(STORE_NODE_ID);
+  const finalTickets = allActive.length > 0 ? allActive : activeKDSTickets;
+
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
-      client.send(JSON.stringify({ type: 'KDS_TICKETS_UPDATED', tickets: activeKDSTickets }));
+      client.send(JSON.stringify({ type: 'KDS_TICKETS_UPDATED', tickets: finalTickets }));
     }
   });
 
-  res.json({ success: true, tickets: activeKDSTickets });
+  res.json({ success: true, tickets: finalTickets, bumpedTicket: bumped });
+});
+
+// ─── Master Data Management (MDM - CRUD Boundary) ──────────────────────
+// 1. Store Outlet Configurations CRUD
+app.get('/api/v1/mdm/stores', (_req, res) => {
+  res.json({ success: true, stores: storeMDM.listStores() });
+});
+
+app.get('/api/v1/mdm/stores/:id', (req, res) => {
+  const store = storeMDM.getStoreById(req.params.id);
+  if (!store) return res.status(404).json({ success: false, error: 'Store not found' });
+  res.json({ success: true, store });
+});
+
+app.post('/api/v1/mdm/stores', (req, res) => {
+  try {
+    const store = storeMDM.createStore(req.body);
+    res.status(201).json({ success: true, store });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.put('/api/v1/mdm/stores/:id', (req, res) => {
+  try {
+    const store = storeMDM.updateStore(req.params.id, req.body);
+    res.json({ success: true, store });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/v1/mdm/stores/:id', (req, res) => {
+  const deactivated = storeMDM.deactivateStore(req.params.id);
+  res.json({ success: deactivated });
+});
+
+// 2. Staff Rosters CRUD
+app.get(['/api/v1/mdm/staff', '/api/labor/staff'], (req, res) => {
+  const storeId = (req.query.storeId as string) || STORE_NODE_ID;
+  res.json({ success: true, staff: staffMDM.listStaff(storeId) });
+});
+
+app.get(['/api/v1/mdm/staff/:id', '/api/labor/staff/:id'], (req, res) => {
+  const staff = staffMDM.getStaffById(req.params.id);
+  if (!staff) return res.status(404).json({ success: false, error: 'Staff member not found' });
+  res.json({ success: true, staff });
+});
+
+app.post(['/api/v1/mdm/staff', '/api/labor/staff'], (req, res) => {
+  try {
+    const staff = staffMDM.createStaff(req.body);
+    res.status(201).json({ success: true, staff });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.put(['/api/v1/mdm/staff/:id', '/api/labor/staff/:id'], (req, res) => {
+  try {
+    const staff = staffMDM.updateStaff(req.params.id, req.body);
+    res.json({ success: true, staff });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.delete(['/api/v1/mdm/staff/:id', '/api/labor/staff/:id'], (req, res) => {
+  const deleted = staffMDM.deleteStaff(req.params.id);
+  res.json({ success: deleted });
+});
+
+// 3. Master Menu Items CRUD
+app.get(['/api/v1/mdm/menu/items'], (_req, res) => {
+  res.json({ success: true, menuItems: menuMDM.listMenuItems() });
+});
+
+app.get(['/api/v1/mdm/menu/items/:id'], (req, res) => {
+  const item = menuMDM.getMenuItemById(req.params.id);
+  if (!item) return res.status(404).json({ success: false, error: 'Menu item not found' });
+  res.json({ success: true, item });
+});
+
+app.post(['/api/v1/mdm/menu/items'], (req, res) => {
+  try {
+    const item = menuMDM.createMenuItem(req.body);
+    res.status(201).json({ success: true, item });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.put(['/api/v1/mdm/menu/items/:id'], (req, res) => {
+  try {
+    const item = menuMDM.updateMenuItem(req.params.id, req.body);
+    res.json({ success: true, item });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.delete(['/api/v1/mdm/menu/items/:id'], (req, res) => {
+  const deleted = menuMDM.deleteMenuItem(req.params.id);
+  res.json({ success: deleted });
+});
+
+// ─── CQRS Query Endpoints (Projections) ──────────────────────────────────
+app.get('/api/pos/active-orders', (req, res) => {
+  const terminalId = req.query.terminalId as string | undefined;
+  const orders = cqrsEngine.getCashierActiveOrders(STORE_NODE_ID, terminalId);
+  res.json({ success: true, orders });
+});
+
+app.get('/api/inventory/stock-levels', (_req, res) => {
+  res.json({ success: true, stockLevels: cqrsEngine.getInventoryStock(STORE_NODE_ID) });
+});
+
+app.get('/api/inventory/depletions', (req, res) => {
+  const orderId = req.query.orderId as string | undefined;
+  res.json({ success: true, depletions: cqrsEngine.getDepletionHistory(orderId) });
+});
+
+app.get('/api/v1/cqrs/metrics', (_req, res) => {
+  res.json({ success: true, metrics: cqrsEngine.getQueueMetrics() });
 });
 
 // ─── Fully Dynamic Cash & Drawer Management Endpoints ───────────────────

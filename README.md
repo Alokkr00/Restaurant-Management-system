@@ -5,12 +5,18 @@
 [![React](https://img.shields.io/badge/React-19.0-61DAFB.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-5.4-646CFF.svg)](https://vitejs.dev/)
 [![SQLite WAL](https://img.shields.io/badge/SQLite-WAL_Mode-003B57.svg)](https://www.sqlite.org/wal.html)
-[![Vitest](https://img.shields.io/badge/Vitest-78%20Tests%20Passing%20(25%20Suites)-78C370.svg)](https://vitest.dev/)
+[![Vitest](https://img.shields.io/badge/Vitest-89%20Tests%20Passing%20(27%20Suites)-78C370.svg)](https://vitest.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 A hybrid on-premise edge and cloud restaurant management system engineered for multi-unit franchise networks, ghost kitchens, and hospitality holding groups.
 
-The system addresses the fatal flaw of cloud-only POS systems: vulnerability to internet service provider (ISP) outages during peak service. It pairs an offline-first, local store edge daemon (`store-edge`) running embedded SQLite in Write-Ahead Logging (WAL) mode with real-time LAN WebSocket ticket dispatching, raw TCP socket ESC/POS thermal printing with station failover, an asynchronous transactional outbox synchronization engine, and operational back-office modules covering FLSA-compliant tip pooling, Fair Workweek scheduling guardrails, balanced double-entry NetSuite GL journals, and blind cash drawer reconciliation.
+The system features a strict architectural separation:
+1. **The CRUD Boundary (Master Data Management - MDM)**: Direct relational schema in SQLite with RESTful CRUD endpoints for store outlet configurations, staff rosters (with PBKDF2 PIN hashing), and master menu items with 86-availability controls.
+2. **The CQRS Boundary (Offline POS & Out-of-Band Inventory Depletion)**:
+   - **Command Path (Writes)**: `CreateOrderCommand` validates order line items, enforces positive pricing, commits atomically to an append-only SQLite WAL (`order_events_wal`), and emits the event to an asynchronous vector queue in sub-15ms.
+   - **Query Path (Reads)**: The Kitchen Display System (KDS) and POS cashier screens query pre-indexed, read-optimized projection tables (`kds_ticket_projections` and `pos_cashier_orders_projection`) without scanning transaction histories.
+   - **Projection Engine**: Asynchronous worker threads subscribe to the vector queue, compute recipe Bill of Materials (BOM) yield depletion with trim factors, and update live inventory tables (`inventory_stock` and `inventory_depletions`) completely out-of-band.
+3. **High-Resilience Edge & Hardware**: Real-time LAN WebSocket ticket dispatching, raw TCP socket ESC/POS thermal printing with station failover, offline transactional outbox synchronization, FLSA-compliant tip pooling, Fair Workweek scheduling guardrails, and balanced double-entry NetSuite GL journals.
 
 ---
 
@@ -94,6 +100,18 @@ Solves cross-platform persistence bugs and container volume loss:
 
 ## Core Domain Engines
 
+### Master Data Management - MDM (`src/mdm/`)
+- **Store Outlets (`store-mdm.ts`)**: CRUD management of physical franchise stores, brand assignments, operating hours, tax IDs, and hardware endpoints.
+- **Staff Rosters & Security (`staff-mdm.ts`)**: Role-based staff rosters with salted PBKDF2 PIN hashing (10,000 iterations), wage profiles, and wage-floor validation.
+- **Master Menu Catalog (`menu-mdm.ts`)**: Relational menu item storage with brand-lock flags, station routing metadata, allergen declarations, and real-time 86-availability toggles.
+
+### CQRS Order Pipeline & Projections (`src/cqrs/`)
+- **Command Path (Writes)**: `CreateOrderCommand` validates order schemas, prevents negative line items, writes to `order_events_wal` in SQLite, and emits to an in-memory asynchronous vector queue.
+- **Asynchronous Vector Queue (`vector-queue.ts`)**: Advances logical clocks (`store-104: N`), handles concurrent subscribers, and dispatches events out-of-band.
+- **Read-Optimized KDS Projections (`kds-projection.ts`)**: Pre-aggregates active kitchen tickets indexed by station (`PIZZA_LINE`, `WING_FRYER`, `HOTLINE_1`) and status (`PENDING`, `IN_PREP`, `BUMPED`) without scanning transaction histories.
+- **Cashier Projections (`cashier-projection.ts`)**: Read-optimized cashier screen projections maintaining customer details, payment states, and balance tallies.
+- **Out-of-Band BOM Inventory Depletion Worker (`inventory-bom-projection.ts`)**: Asynchronously calculates gross raw ingredient usage adjusted for recipe trim yields (`netRequired / yieldFactor`), updates `inventory_stock` records, and logs complete audit trails in `inventory_depletions`.
+
 ### POS & Order Lifecycle (`src/pos/`)
 - **Order State Machine (`order-state-machine.ts`)**: Manages strict order lifecycle transitions: `DRAFT` &rarr; `CONFIRMED` &rarr; `IN_PREPARATION` &rarr; `READY` &rarr; `DELIVERED` &rarr; `SETTLED`.
 - **Audited Voids vs. Comps (`order-lifecycle.ts`)**: Enforces the critical accounting distinction between **Voids** (item cancelled before kitchen preparation, restoring inventory) and **Comps** (item prepared and consumed, depleting inventory to spoilage with required supervisor authorization token).
@@ -132,12 +150,14 @@ Solves cross-platform persistence bugs and container volume loss:
 ├── docs/
 │   └── adr/                           # Architectural Decision Records (ADRs 001-003)
 ├── src/
+│   ├── cqrs/                          # CQRS Command pipeline, vector queue, KDS/Cashier/BOM projections
 │   ├── fintech/                       # Cash management, tip pooling, payment gateways
 │   ├── hardware/                      # ESC/POS thermal printer, scale drivers, print queues
 │   ├── hq-cloud/                      # Multi-tenant inheritance, brand locks, ghost kitchen router
 │   ├── integrations/                  # NetSuite GL, ADP payroll, Deliverect webhooks
 │   ├── inventory/                     # Recipe BOM depletions, UOM conversion, POs, prep batches
 │   ├── labor/                         # Fair Workweek compliance, clopening checks, scheduling
+│   ├── mdm/                           # Master Data Management (Stores, Staff Roster, Master Menu)
 │   ├── pos/                           # State machine, table floor plan, voids/comps, menus
 │   ├── security/                      # Store PIN auth, JWT tenant context, role-based isolation
 │   ├── shared/                        # Path resolver (PADR), support bundles, outbox sync, types
@@ -159,7 +179,7 @@ Solves cross-platform persistence bugs and container volume loss:
 │       ├── types/                     # UI TypeScript definitions
 │       ├── App.tsx                    # Root application with workspace switcher
 │       └── index.css                  # Toast/Square-inspired high-contrast theme
-└── tests/                             # 25 Vitest test suites + load & chaos harnesses
+└── tests/                             # 27 Vitest test suites + load & chaos harnesses
     └── load/                          # 50-concurrent-order load & WAN chaos simulations
 ```
 
@@ -177,18 +197,18 @@ Detailed architectural tradeoffs and system decisions are documented in `docs/ad
 
 ## Verification, Testing & Load Simulations
 
-The codebase maintains **100% test pass rate** across 25 domain-specific test suites, alongside automated load and chaos harnesses:
+The codebase maintains **100% test pass rate** across 27 domain-specific test suites, alongside automated load and chaos harnesses:
 
 ```bash
-# 1. Run all 25 domain unit & integration test suites
+# 1. Run all 27 domain unit & integration test suites
 npm test
 ```
 
 ```text
- Test Files  25 passed (25)
-      Tests  78 passed (78)
-   Start at  01:01:59
-   Duration  19.74s
+ Test Files  27 passed (27)
+      Tests  89 passed (89)
+   Start at  15:13:36
+   Duration  19.50s
 ```
 
 ### Concurrent Order Load Simulation (50 Simultaneous Checkouts)

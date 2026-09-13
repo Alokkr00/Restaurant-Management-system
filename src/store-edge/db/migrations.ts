@@ -384,6 +384,108 @@ export const migrations: Migration[] = [
         WHERE store_id = 'store-104';
       `);
     }
+  },
+  {
+    version: 3,
+    name: '003_cqrs_and_mdm_schema',
+    up: (db: any) => {
+      db.exec(`
+        -- Append-Only SQLite WAL Order Event Store
+        CREATE TABLE IF NOT EXISTS order_events_wal (
+          event_id TEXT PRIMARY KEY,
+          order_id TEXT NOT NULL,
+          event_type TEXT NOT NULL,
+          aggregate_version INTEGER NOT NULL DEFAULT 1,
+          store_id TEXT NOT NULL,
+          terminal_id TEXT NOT NULL,
+          payload_json TEXT NOT NULL,
+          vector_clock TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_order_events_order_id ON order_events_wal(order_id);
+        CREATE INDEX IF NOT EXISTS idx_order_events_store_created ON order_events_wal(store_id, created_at);
+
+        -- Read-Optimized KDS Ticket Projection
+        CREATE TABLE IF NOT EXISTS kds_ticket_projections (
+          ticket_id TEXT PRIMARY KEY,
+          order_id TEXT NOT NULL,
+          store_id TEXT NOT NULL,
+          station TEXT NOT NULL,
+          status TEXT NOT NULL CHECK(status IN ('PENDING', 'IN_PREP', 'READY', 'LATE', 'BUMPED')),
+          source TEXT NOT NULL DEFAULT 'POS Register',
+          dining_type TEXT NOT NULL DEFAULT 'DINE IN',
+          table_number TEXT,
+          server_name TEXT,
+          items_json TEXT NOT NULL,
+          elapsed_minutes INTEGER NOT NULL DEFAULT 0,
+          elapsed_seconds INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          bumped_at TEXT,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_kds_station_status ON kds_ticket_projections(store_id, station, status);
+        CREATE INDEX IF NOT EXISTS idx_kds_order_id ON kds_ticket_projections(order_id);
+
+        -- Read-Optimized POS Cashier Active Orders Projection
+        CREATE TABLE IF NOT EXISTS pos_cashier_orders_projection (
+          order_id TEXT PRIMARY KEY,
+          store_id TEXT NOT NULL,
+          terminal_id TEXT NOT NULL,
+          table_id TEXT,
+          status TEXT NOT NULL,
+          total_cents INTEGER NOT NULL,
+          items_count INTEGER NOT NULL,
+          items_summary TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_cashier_orders_active ON pos_cashier_orders_projection(store_id, status);
+
+        -- Relational Inventory Stock Table
+        CREATE TABLE IF NOT EXISTS inventory_stock (
+          ingredient_id TEXT PRIMARY KEY,
+          store_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          category TEXT NOT NULL,
+          unit TEXT NOT NULL,
+          stock_on_hand REAL NOT NULL DEFAULT 0.0,
+          theoretical_quantity REAL NOT NULL DEFAULT 0.0,
+          par_level REAL NOT NULL DEFAULT 10.0,
+          reorder_point REAL NOT NULL DEFAULT 5.0,
+          unit_cost_cents INTEGER NOT NULL DEFAULT 0,
+          last_depleted_at TEXT,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_inventory_stock_store ON inventory_stock(store_id, category);
+
+        -- Append-Only Recipe BOM Yield Depletion Trail
+        CREATE TABLE IF NOT EXISTS inventory_depletions (
+          depletion_id TEXT PRIMARY KEY,
+          order_id TEXT NOT NULL,
+          event_id TEXT NOT NULL,
+          ingredient_id TEXT NOT NULL,
+          ingredient_name TEXT NOT NULL,
+          quantity_depleted REAL NOT NULL,
+          unit TEXT NOT NULL,
+          yield_factor REAL NOT NULL DEFAULT 1.0,
+          gross_usage REAL NOT NULL,
+          cost_cents INTEGER NOT NULL DEFAULT 0,
+          depleted_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_inventory_depletions_order ON inventory_depletions(order_id);
+        CREATE INDEX IF NOT EXISTS idx_inventory_depletions_ing ON inventory_depletions(ingredient_id, depleted_at);
+
+        -- Seed Initial Inventory Stock for Store #104
+        INSERT OR IGNORE INTO inventory_stock (ingredient_id, store_id, name, category, unit, stock_on_hand, theoretical_quantity, par_level, reorder_point, unit_cost_cents, updated_at)
+        VALUES
+          ('ing-flour', 'store-104', 'High-Gluten Flour Batch', 'DRY_GOODS', 'kg', 120.0, 120.0, 50.0, 20.0, 125, datetime('now')),
+          ('ing-cheese', 'store-104', 'Mozzarella Cheese (Shredded)', 'DAIRY', 'kg', 45.0, 45.0, 30.0, 15.0, 210, datetime('now')),
+          ('ing-pepperoni', 'store-104', 'Pepperoni Slices', 'MEAT', 'kg', 25.0, 25.0, 15.0, 8.0, 180, datetime('now')),
+          ('ing-wings', 'store-104', 'Raw Chicken Wings', 'MEAT', 'kg', 60.0, 60.0, 40.0, 20.0, 340, datetime('now')),
+          ('ing-hot-sauce', 'store-104', 'Buffalo Hot Sauce', 'CONDIMENTS', 'L', 18.0, 18.0, 10.0, 5.0, 85, datetime('now')),
+          ('ing-garlic-butter', 'store-104', 'Artisanal Garlic Butter', 'DAIRY', 'kg', 12.0, 12.0, 8.0, 4.0, 140, datetime('now'));
+      `);
+    }
   }
 ];
 
