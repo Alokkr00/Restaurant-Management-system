@@ -1,4 +1,3 @@
-import Database from 'better-sqlite3';
 import crypto from 'crypto';
 
 const uuidv4 = () => crypto.randomUUID();

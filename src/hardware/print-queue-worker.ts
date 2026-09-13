@@ -1,4 +1,3 @@
-import Database from 'better-sqlite3';
 import net from 'net';
 
 export interface PrintJobRecord {

@@ -1,5 +1,3 @@
-import Database from 'better-sqlite3';
-
 export interface OutboxEventRecord {
   event_id: string;
   store_id: string;

@@ -1,5 +1,4 @@
 import crypto from 'crypto';
-import Database from 'better-sqlite3';
 
 export type UserRole = 'CASHIER' | 'SERVER' | 'KITCHEN' | 'MANAGER' | 'ADMIN';
 

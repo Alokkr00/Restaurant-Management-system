@@ -1,5 +1,3 @@
-import Database from 'better-sqlite3';
-
 export interface Migration {
   version: number;
   name: string;
@@ -10,7 +8,7 @@ export const migrations: Migration[] = [
   {
     version: 1,
     name: '001_initial_production_schema',
-    up: (db: Database.Database) => {
+    up: (db: any) => {
       db.exec(`
         -- Migration Tracking Table
         CREATE TABLE IF NOT EXISTS schema_migrations (
