@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { StoreAPI } from '../../services/api';
 import {
@@ -19,6 +19,16 @@ export const CashDrawer: React.FC = () => {
   const [witness, setWitness] = useState('Manager Jane');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Close modal on Escape key
+  useEffect(() => {
+    if (!modalType) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isSubmitting) setModalType(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [modalType, isSubmitting]);
 
   const handleActionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,27 +184,39 @@ export const CashDrawer: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {drawerSession.activityLedger.map((act, idx) => (
-                <tr key={idx}>
-                  <td className="font-mono">{act.timestamp}</td>
-                  <td>
-                    <span
-                      className={`badge ${
-                        act.activityType === 'OPENING'
-                          ? 'badge-online'
-                          : act.activityType === 'SAFE DROP'
-                          ? 'badge-warning'
-                          : 'badge-danger'
-                      }`}
-                    >
-                      {act.activityType}
-                    </span>
+              {drawerSession.activityLedger.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="empty-table-cell">
+                    <div className="empty-table-content">
+                      <History size={32} className="empty-table-icon" />
+                      <div className="empty-table-text">No Shift Activity Recorded</div>
+                      <div className="empty-table-sub">Cash drawer transactions, safe drops, and payouts will appear here in chronological order.</div>
+                    </div>
                   </td>
-                  <td className="font-mono font-bold">${act.amount.toFixed(2)}</td>
-                  <td>{act.witness}</td>
-                  <td className="text-muted">{act.notes}</td>
                 </tr>
-              ))}
+              ) : (
+                drawerSession.activityLedger.map((act, idx) => (
+                  <tr key={idx}>
+                    <td className="font-mono">{act.timestamp}</td>
+                    <td>
+                      <span
+                        className={`badge ${
+                          act.activityType === 'OPENING'
+                            ? 'badge-online'
+                            : act.activityType === 'SAFE DROP'
+                            ? 'badge-warning'
+                            : 'badge-danger'
+                        }`}
+                      >
+                        {act.activityType}
+                      </span>
+                    </td>
+                    <td className="font-mono font-bold">${act.amount.toFixed(2)}</td>
+                    <td>{act.witness}</td>
+                    <td className="text-muted">{act.notes}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

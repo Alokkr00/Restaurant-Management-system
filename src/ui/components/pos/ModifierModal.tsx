@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MenuItem } from '../../types/ui-types';
 import { useStore } from '../../context/StoreContext';
 import { X, Check } from 'lucide-react';
@@ -10,6 +10,14 @@ interface ModifierModalProps {
 
 export const ModifierModal: React.FC<ModifierModalProps> = ({ item, onClose }) => {
   const { addToCart } = useStore();
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const availableModifiers = [
     { name: 'Extra Cheese', price: 1.50 },

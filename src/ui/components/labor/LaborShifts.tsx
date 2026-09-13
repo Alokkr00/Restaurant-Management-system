@@ -43,53 +43,65 @@ export const LaborShifts: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {employees.map((emp) => {
-                const isClockedIn = emp.status === 'CLOCKED_IN';
-                return (
-                  <tr key={emp.id}>
-                    <td className="font-mono font-bold">{emp.id}</td>
-                    <td>
-                      <div className="font-bold">{emp.name}</div>
-                    </td>
-                    <td>{emp.role}</td>
-                    <td>
-                      <span className={`badge ${isClockedIn ? 'badge-online' : 'badge-offline'}`}>
-                        {emp.status}
-                      </span>
-                    </td>
-                    <td className="text-muted">
-                      {isClockedIn ? (
-                        <span className="flex items-center gap-1">
-                          <Clock size={12} />
-                          <span>{emp.shiftStart || '09:00 AM'}</span>
+              {employees.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="empty-table-cell">
+                    <div className="empty-table-content">
+                      <Users size={32} className="empty-table-icon" />
+                      <div className="empty-table-text">No Shift Staff Registered</div>
+                      <div className="empty-table-sub">Employee rosters, scheduled shifts, and timecard punch statuses will appear here.</div>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                employees.map((emp) => {
+                  const isClockedIn = emp.status === 'CLOCKED_IN';
+                  return (
+                    <tr key={emp.id}>
+                      <td className="font-mono font-bold">{emp.id}</td>
+                      <td>
+                        <div className="font-bold">{emp.name}</div>
+                      </td>
+                      <td>{emp.role}</td>
+                      <td>
+                        <span className={`badge ${isClockedIn ? 'badge-online' : 'badge-offline'}`}>
+                          {emp.status}
                         </span>
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="font-mono">${Number(emp.hourlyRateUSD ?? 16.50).toFixed(2)}</td>
-                    <td className="font-mono font-bold">{emp.hoursThisWeek ?? (emp as any).hours ?? 30}h</td>
-                    <td>
-                      <button
-                        className={`btn-table-action ${isClockedIn ? 'btn-clock-out' : 'btn-clock-in'}`}
-                        onClick={() => toggleClock(emp.id, !isClockedIn)}
-                      >
+                      </td>
+                      <td className="text-muted">
                         {isClockedIn ? (
-                          <>
-                            <LogOut size={13} />
-                            <span>Clock Out</span>
-                          </>
+                          <span className="flex items-center gap-1">
+                            <Clock size={12} />
+                            <span>{emp.shiftStart || '09:00 AM'}</span>
+                          </span>
                         ) : (
-                          <>
-                            <LogIn size={13} />
-                            <span>Clock In</span>
-                          </>
+                          '—'
                         )}
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                      <td className="font-mono">${Number(emp.hourlyRateUSD ?? 16.50).toFixed(2)}</td>
+                      <td className="font-mono font-bold">{emp.hoursThisWeek ?? (emp as any).hours ?? 30}h</td>
+                      <td>
+                        <button
+                          className={`btn-table-action ${isClockedIn ? 'btn-clock-out' : 'btn-clock-in'}`}
+                          onClick={() => toggleClock(emp.id, !isClockedIn)}
+                        >
+                          {isClockedIn ? (
+                            <>
+                              <LogOut size={13} />
+                              <span>Clock Out</span>
+                            </>
+                          ) : (
+                            <>
+                              <LogIn size={13} />
+                              <span>Clock In</span>
+                            </>
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

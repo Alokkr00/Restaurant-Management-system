@@ -100,16 +100,28 @@ export const FinancialsView: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {journalEntries.map((je) => (
-                <tr key={je.id}>
-                  <td className="font-mono font-bold">{je.id}</td>
-                  <td className="text-muted">{je.date}</td>
-                  <td className="font-bold">{je.account}</td>
-                  <td className="font-mono">{je.debit > 0 ? `$${je.debit.toFixed(2)}` : '—'}</td>
-                  <td className="font-mono">{je.credit > 0 ? `$${je.credit.toFixed(2)}` : '—'}</td>
-                  <td className="text-muted">{je.memo}</td>
+              {journalEntries.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="empty-table-cell">
+                    <div className="empty-table-content">
+                      <Landmark size={32} className="empty-table-icon" />
+                      <div className="empty-table-text">No General Ledger Entries Posted</div>
+                      <div className="empty-table-sub">End-of-day journal batches and automated sales debits will populate here once transactions close.</div>
+                    </div>
+                  </td>
                 </tr>
-              ))}
+              ) : (
+                journalEntries.map((je) => (
+                  <tr key={je.id}>
+                    <td className="font-mono font-bold">{je.id}</td>
+                    <td className="text-muted">{je.date}</td>
+                    <td className="font-bold">{je.account}</td>
+                    <td className="font-mono">{je.debit > 0 ? `$${je.debit.toFixed(2)}` : '—'}</td>
+                    <td className="font-mono">{je.credit > 0 ? `$${je.credit.toFixed(2)}` : '—'}</td>
+                    <td className="text-muted">{je.memo}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
             <tfoot>
               <tr className="totals-summary-row">

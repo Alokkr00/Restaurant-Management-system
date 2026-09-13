@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { ModuleType } from '../../types/ui-types';
 import {
@@ -34,6 +34,34 @@ export const Navbar: React.FC = () => {
   const [backOfficeOpen, setBackOfficeOpen] = useState(false);
   const [trainingMode, setTrainingMode] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click or Escape key
+  useEffect(() => {
+    if (!backOfficeOpen) return;
+
+    const handlePointerDown = (e: MouseEvent | TouchEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setBackOfficeOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setBackOfficeOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('touchstart', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('touchstart', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [backOfficeOpen]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -95,13 +123,13 @@ export const Navbar: React.FC = () => {
       <div className="brand-section">
         <img src="/restaurant_logo.jpg" alt="Restaurant Logo" className="logo-img" />
         <div>
-          <div className="brand-title">RMS Store Console</div>
+          <h1 className="brand-title">RMS Store Console</h1>
           <div className="brand-subtitle">STORE #104 CHICAGO WEST &bull; EDGE WAL</div>
         </div>
       </div>
 
       {/* Module Navigation Tabs */}
-      <nav className="module-nav">
+      <nav className="module-nav" aria-label="Main Module Navigation">
         {navTabs.map((tab) => (
           <button
             key={tab.id}
@@ -117,10 +145,12 @@ export const Navbar: React.FC = () => {
         ))}
 
         {/* Back Office Dropdown */}
-        <div className="dropdown-container">
+        <div className="dropdown-container" ref={dropdownRef}>
           <button
             className={`nav-tab ${isBackOfficeActive ? 'active' : ''}`}
             onClick={() => setBackOfficeOpen(!backOfficeOpen)}
+            aria-haspopup="true"
+            aria-expanded={backOfficeOpen}
           >
             <Boxes size={15} />
             <span>Back Office</span>

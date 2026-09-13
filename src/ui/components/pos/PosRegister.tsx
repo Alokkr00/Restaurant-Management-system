@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { CategoryChips } from './CategoryChips';
 import { MenuGrid } from './MenuGrid';
@@ -12,6 +12,17 @@ export const PosRegister: React.FC = () => {
   const [dropAmount, setDropAmount] = useState('100.00');
   const [dropWitness, setDropWitness] = useState('Manager Sarah');
   const [dropNotes, setDropNotes] = useState('Surplus register drop to drop-safe');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Close modal on Escape key
+  useEffect(() => {
+    if (!safeDropModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isSubmitting) setSafeDropModalOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [safeDropModalOpen, isSubmitting]);
 
   const handleSafeDropSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,6 +31,7 @@ export const PosRegister: React.FC = () => {
       showToast('Enter a valid safe drop amount', 'error');
       return;
     }
+    setIsSubmitting(true);
     try {
       await StoreAPI.safeDrop({ amount: amt, witness: dropWitness, notes: dropNotes });
       showToast(`Safe drop of $${amt.toFixed(2)} logged to drawer ledger`, 'success');
@@ -27,6 +39,8 @@ export const PosRegister: React.FC = () => {
       refreshData();
     } catch {
       showToast('Failed to log safe drop', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -68,14 +82,14 @@ export const PosRegister: React.FC = () => {
 
       {/* Safe Drop Modal */}
       {safeDropModalOpen && (
-        <div className="modal-overlay" onClick={() => setSafeDropModalOpen(false)}>
+        <div className="modal-overlay" onClick={() => !isSubmitting && setSafeDropModalOpen(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
                 <h3 className="modal-title">Mid-Shift Safe Drop</h3>
                 <span className="modal-subtitle">Transfer surplus cash from terminal drawer to safe</span>
               </div>
-              <button className="btn-close" onClick={() => setSafeDropModalOpen(false)}>
+              <button className="btn-close" disabled={isSubmitting} onClick={() => setSafeDropModalOpen(false)}>
                 <X size={18} />
               </button>
             </div>
@@ -91,6 +105,8 @@ export const PosRegister: React.FC = () => {
                     value={dropAmount}
                     onChange={(e) => setDropAmount(e.target.value)}
                     required
+                    autoFocus
+                    disabled={isSubmitting}
                   />
                 </div>
                 <div className="form-group">
@@ -101,6 +117,7 @@ export const PosRegister: React.FC = () => {
                     value={dropWitness}
                     onChange={(e) => setDropWitness(e.target.value)}
                     required
+                    disabled={isSubmitting}
                   />
                 </div>
                 <div className="form-group">
@@ -110,6 +127,7 @@ export const PosRegister: React.FC = () => {
                     className="form-input"
                     value={dropNotes}
                     onChange={(e) => setDropNotes(e.target.value)}
+                    disabled={isSubmitting}
                   />
                 </div>
               </div>
@@ -118,12 +136,17 @@ export const PosRegister: React.FC = () => {
                 <button
                   type="button"
                   className="btn-secondary"
+                  disabled={isSubmitting}
                   onClick={() => setSafeDropModalOpen(false)}
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary">
-                  Confirm Safe Drop
+                <button
+                  type="submit"
+                  className={`btn-primary ${isSubmitting ? 'btn-loading' : ''}`}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? <span className="spin-loader" /> : 'Confirm Safe Drop'}
                 </button>
               </div>
             </form>

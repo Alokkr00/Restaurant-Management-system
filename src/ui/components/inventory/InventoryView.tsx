@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
 import { Boxes, Trash2, BookOpen, AlertTriangle, Plus, X } from 'lucide-react';
 import { StoreAPI } from '../../services/api';
@@ -10,10 +10,22 @@ export const InventoryView: React.FC = () => {
   const [wasteQty, setWasteQty] = useState('1.5 kg');
   const [wasteReason, setWasteReason] = useState('Expired / Over temp');
   const [wasteCost, setWasteCost] = useState('18.00');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Close modal on Escape key
+  useEffect(() => {
+    if (!wasteModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !isSubmitting) setWasteModalOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [wasteModalOpen, isSubmitting]);
 
   const handleLogWasteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cost = parseFloat(wasteCost);
+    setIsSubmitting(true);
     try {
       await StoreAPI.logWaste({
         item: wasteItem,
@@ -26,6 +38,8 @@ export const InventoryView: React.FC = () => {
       refreshData();
     } catch {
       showToast('Failed to log waste', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -63,17 +77,29 @@ export const InventoryView: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {stockLevels.map((stk) => (
-                <tr key={stk.ingredientId}>
-                  <td className="font-mono font-bold">{stk.ingredientId}</td>
-                  <td>{stk.name}</td>
-                  <td className="font-mono font-bold text-lg">{Number(stk.balance ?? 0).toFixed(1)}</td>
-                  <td>{stk.unit}</td>
-                  <td>
-                    <span className="badge badge-online">Within Par (&plusmn;1.2%)</span>
+              {stockLevels.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="empty-table-cell">
+                    <div className="empty-table-content">
+                      <Boxes size={32} className="empty-table-icon" />
+                      <div className="empty-table-text">No Stock Level Records Found</div>
+                      <div className="empty-table-sub">Current ingredient balances and FIFO allocations will synchronize from the store inventory database.</div>
+                    </div>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                stockLevels.map((stk) => (
+                  <tr key={stk.ingredientId}>
+                    <td className="font-mono font-bold">{stk.ingredientId}</td>
+                    <td>{stk.name}</td>
+                    <td className="font-mono font-bold text-lg">{Number(stk.balance ?? 0).toFixed(1)}</td>
+                    <td>{stk.unit}</td>
+                    <td>
+                      <span className="badge badge-online">Within Par (&plusmn;1.2%)</span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -86,26 +112,36 @@ export const InventoryView: React.FC = () => {
           <span>Bill of Materials (BOM) Recipe Depletion Matrix</span>
         </div>
 
-        <div className="recipes-grid">
-          {recipes.map((rcp) => (
-            <div key={rcp.id} className="recipe-card">
-              <div className="recipe-card-header">
-                <h4 className="recipe-name">{rcp.name}</h4>
-                <span className="recipe-yield">Yield: {rcp.targetYield ?? 1} Serving</span>
-              </div>
-              <div className="recipe-ingredients-list">
-                {rcp.ingredients.map((ing, ii) => (
-                  <div key={ii} className="recipe-ing-row">
-                    <span>{ing.name}</span>
-                    <span className="font-mono font-bold">
-                      {ing.qty} {ing.unit} (${Number(ing.cost ?? 1.50).toFixed(2)})
-                    </span>
-                  </div>
-                ))}
-              </div>
+        {recipes.length === 0 ? (
+          <div className="empty-table-cell" style={{ padding: '2rem 1rem' }}>
+            <div className="empty-table-content">
+              <BookOpen size={32} className="empty-table-icon" />
+              <div className="empty-table-text">No Recipe BOMs Defined</div>
+              <div className="empty-table-sub">Bill of materials depletion rules will synchronize from corporate master recipes.</div>
             </div>
-          ))}
-        </div>
+          </div>
+        ) : (
+          <div className="recipes-grid">
+            {recipes.map((rcp) => (
+              <div key={rcp.id} className="recipe-card">
+                <div className="recipe-card-header">
+                  <h4 className="recipe-name">{rcp.name}</h4>
+                  <span className="recipe-yield">Yield: {rcp.targetYield ?? 1} Serving</span>
+                </div>
+                <div className="recipe-ingredients-list">
+                  {rcp.ingredients.map((ing, ii) => (
+                    <div key={ii} className="recipe-ing-row">
+                      <span>{ing.name}</span>
+                      <span className="font-mono font-bold">
+                        {ing.qty} {ing.unit} (${Number(ing.cost ?? 1.50).toFixed(2)})
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Spoilage & Waste Logs Table */}
@@ -128,23 +164,35 @@ export const InventoryView: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {spoilageLogs.map((log) => (
-                <tr key={log.id}>
-                  <td className="font-mono">{log.id}</td>
-                  <td className="text-muted">{log.date || 'Today'}</td>
-                  <td>{log.item}</td>
-                  <td className="font-mono">{log.qty}</td>
-                  <td>
-                    <span className="badge badge-danger">
-                      <AlertTriangle size={11} />
-                      <span>{log.reason}</span>
-                    </span>
-                  </td>
-                  <td className="font-mono font-bold text-rose">
-                    -${Number(log.costUSD ?? 0).toFixed(2)}
+              {spoilageLogs.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="empty-table-cell">
+                    <div className="empty-table-content">
+                      <Trash2 size={32} className="empty-table-icon" />
+                      <div className="empty-table-text">No Waste or Spoilage Logged</div>
+                      <div className="empty-table-sub">Click "Log Spoilage / Waste" above to record any dropped, expired, or spoiled ingredients.</div>
+                    </div>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                spoilageLogs.map((log) => (
+                  <tr key={log.id}>
+                    <td className="font-mono">{log.id}</td>
+                    <td className="text-muted">{log.date || 'Today'}</td>
+                    <td>{log.item}</td>
+                    <td className="font-mono">{log.qty}</td>
+                    <td>
+                      <span className="badge badge-danger">
+                        <AlertTriangle size={11} />
+                        <span>{log.reason}</span>
+                      </span>
+                    </td>
+                    <td className="font-mono font-bold text-rose">
+                      -${Number(log.costUSD ?? 0).toFixed(2)}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -152,14 +200,14 @@ export const InventoryView: React.FC = () => {
 
       {/* Waste Logging Modal */}
       {wasteModalOpen && (
-        <div className="modal-overlay" onClick={() => setWasteModalOpen(false)}>
+        <div className="modal-overlay" onClick={() => !isSubmitting && setWasteModalOpen(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div>
                 <h3 className="modal-title">Log Kitchen Spoilage</h3>
                 <span className="modal-subtitle">Record dropped or expired ingredients</span>
               </div>
-              <button className="btn-close" onClick={() => setWasteModalOpen(false)}>
+              <button className="btn-close" disabled={isSubmitting} onClick={() => setWasteModalOpen(false)}>
                 <X size={18} />
               </button>
             </div>
@@ -174,6 +222,8 @@ export const InventoryView: React.FC = () => {
                     value={wasteItem}
                     onChange={(e) => setWasteItem(e.target.value)}
                     required
+                    autoFocus
+                    disabled={isSubmitting}
                   />
                 </div>
                 <div className="form-group">
@@ -184,6 +234,7 @@ export const InventoryView: React.FC = () => {
                     value={wasteQty}
                     onChange={(e) => setWasteQty(e.target.value)}
                     required
+                    disabled={isSubmitting}
                   />
                 </div>
                 <div className="form-group">
@@ -194,6 +245,7 @@ export const InventoryView: React.FC = () => {
                     value={wasteReason}
                     onChange={(e) => setWasteReason(e.target.value)}
                     required
+                    disabled={isSubmitting}
                   />
                 </div>
                 <div className="form-group">
@@ -205,6 +257,7 @@ export const InventoryView: React.FC = () => {
                     value={wasteCost}
                     onChange={(e) => setWasteCost(e.target.value)}
                     required
+                    disabled={isSubmitting}
                   />
                 </div>
               </div>
@@ -213,12 +266,17 @@ export const InventoryView: React.FC = () => {
                 <button
                   type="button"
                   className="btn-secondary"
+                  disabled={isSubmitting}
                   onClick={() => setWasteModalOpen(false)}
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary">
-                  Log Waste Entry
+                <button
+                  type="submit"
+                  className={`btn-primary ${isSubmitting ? 'btn-loading' : ''}`}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? <span className="spin-loader" /> : 'Log Waste Entry'}
                 </button>
               </div>
             </form>
