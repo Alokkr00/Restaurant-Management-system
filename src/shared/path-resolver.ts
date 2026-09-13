@@ -77,21 +77,19 @@ export class PathResolver {
   }
 
   /**
+  /**
    * Detects whether the process is executing inside a Docker container
    */
   private detectDocker(): boolean {
-    if (fs.existsSync('/.dockerenv')) {
+    // Never force container volume path during test execution
+    if (process.env.NODE_ENV === 'test' || process.env.VITEST === 'true') {
+      return false;
+    }
+    if (process.env.RMS_CONTAINER === 'true' || process.env.DOCKER_CONTAINER === 'true') {
       return true;
     }
-    try {
-      if (fs.existsSync('/proc/1/cgroup')) {
-        const content = fs.readFileSync('/proc/1/cgroup', 'utf8');
-        if (content.includes('docker') || content.includes('kubepods') || content.includes('containerd')) {
-          return true;
-        }
-      }
-    } catch {
-      // Non-Linux systems will fail silently
+    if (fs.existsSync('/.dockerenv') && (fs.existsSync('/app') || process.cwd() === '/app')) {
+      return true;
     }
     return false;
   }
@@ -253,8 +251,8 @@ export class PathResolver {
    */
   public resolveSafePath(baseDir: string, userInput: string): string {
     const normalizedBase = path.resolve(baseDir);
-    // Remove null bytes and sanitize input
-    const sanitizedInput = userInput.replace(/\0/g, '');
+    // Remove null bytes and normalize backslashes for cross-platform security
+    const sanitizedInput = userInput.replace(/\0/g, '').replace(/\\/g, '/');
     const resolvedPath = path.resolve(normalizedBase, sanitizedInput);
 
     // Enforce boundary containment
