@@ -35,9 +35,9 @@ flowchart TD
 
     subgraph Store104["Store LAN Edge Appliance (Node.js 20 ESM / Port 3001)"]
         EDGE_SERVER["Express REST Server & Diagnostics Dashboard"]
-        SQLITE_WAL[("Embedded SQLite WAL\nstore-edge.db (better-sqlite3)")]
+        SQLITE_WAL[("Embedded SQLite WAL: store-edge.db")]
         PADR["Platform-Agnostic Directory Resolution (PADR)"]
-        WS_ROUTER["LAN WebSocket Ticket Router (< 20ms)"]
+        WS_ROUTER["LAN WebSocket Ticket Router (sub-20ms)"]
         PRINT_WORKER["Durable Print Queue Worker"]
         OUTBOX_WORKER["Transactional Outbox Sync Engine"]
         ESC_PRIMARY["Primary Hotline ESC/POS Printer (Port 9100)"]
@@ -51,20 +51,21 @@ flowchart TD
         BACK_OFFICE["Manager Back Office Console"]
     end
 
-    StoreClients -->|REST / WS| EDGE_SERVER
-    EDGE_SERVER -->|Atomic Writes| SQLITE_WAL
-    SQLITE_WAL <-->|Canonical Path Routing| PADR
-    EDGE_SERVER -->|Instant Broadcast| WS_ROUTER --> KDS_SCREEN
-    EDGE_SERVER -->|Durable Print Job| PRINT_WORKER
-    PRINT_WORKER -->|Raw TCP Socket| ESC_PRIMARY
-    ESC_PRIMARY -.->|Station Failover| ESC_BACKUP
+    StoreClients -->|"REST / WS"| EDGE_SERVER
+    EDGE_SERVER -->|"Atomic Writes"| SQLITE_WAL
+    SQLITE_WAL <-->|"Canonical Path Routing"| PADR
+    EDGE_SERVER -->|"Instant Broadcast"| WS_ROUTER
+    WS_ROUTER --> KDS_SCREEN
+    EDGE_SERVER -->|"Durable Print Job"| PRINT_WORKER
+    PRINT_WORKER -->|"Raw TCP Socket"| ESC_PRIMARY
+    ESC_PRIMARY -.->|"Station Failover"| ESC_BACKUP
     EDGE_SERVER --> OUTBOX_WORKER
-    OUTBOX_WORKER -->|Batch Sync (synced = 0 -> 1)| HQ_API
+    OUTBOX_WORKER -->|"Batch Sync (synced: 0 to 1)"| HQ_API
     HQ_API --> TENANT_ENG
     HQ_API --> GHOST_ROUTER
     HQ_API --> NETSUITE_EXP
     HQ_API --> ADP_EXP
-    DELIVERECT_INT -->|Order Ingestion| HQ_API
+    DELIVERECT_INT -->|"Order Ingestion"| HQ_API
 ```
 
 ---

@@ -20,20 +20,22 @@ flowchart TD
         EDGE_DAEMON["Store Edge Daemon (Node.js)"]
         SYNC_WORKER["Async Sync Worker (5s loop)"]
         SQLITE_WAL[("SQLite WAL (store-edge.db)")]
-        WS_LAN["WebSocket Ticket Router (<200ms)"]
+        WS_LAN["WebSocket Ticket Router (sub-200ms)"]
         ESC_PRINT["ESC/POS Hotline Printer (Port 9100)"]
         ESC_EXPO["ESC/POS Expo Backup (Auto-Fallback)"]
         POS_TERM["POS Register & Cash Drawer"]
         KDS_SCREEN["Kitchen Display Screen (KDS)"]
     end
 
-    POS_TERM -->|REST / WS| EDGE_DAEMON
-    EDGE_DAEMON -->|Atomic Disk Writes| SQLITE_WAL
-    EDGE_DAEMON -->|Instant LAN Broadcast| WS_LAN --> KDS_SCREEN
-    EDGE_DAEMON -->|Raw ESC/POS Buffer| ESC_PRINT
-    ESC_PRINT -.->|Failover| ESC_EXPO
+    POS_TERM -->|"REST / WS"| EDGE_DAEMON
+    EDGE_DAEMON -->|"Atomic Disk Writes"| SQLITE_WAL
+    EDGE_DAEMON -->|"Instant LAN Broadcast"| WS_LAN
+    WS_LAN --> KDS_SCREEN
+    EDGE_DAEMON -->|"Raw ESC/POS Buffer"| ESC_PRINT
+    ESC_PRINT -.->|"Failover"| ESC_EXPO
     EDGE_DAEMON --> SYNC_WORKER
-    SYNC_WORKER <-->|Asymmetric Replication| NATS <--> HQ_API
+    SYNC_WORKER <-->|"Asymmetric Replication"| NATS
+    NATS <--> HQ_API
     HQ_API --> HQ_DB
     HQ_API --> NS_INT
     HQ_API --> ADP_INT
